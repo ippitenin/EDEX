@@ -24,7 +24,7 @@ class Cpuinfo {
 
             let innercontainer = document.createElement("div");
             innercontainer.setAttribute("id", "mod_cpuinfo_innercontainer");
-            innercontainer.innerHTML = `<h1>CPU USAGE<i>${cpuName}</i></h1>
+            innercontainer.innerHTML = `<h1>CPU USAGE<i>${window._escapeHtml(cpuName)}</i></h1>
                 <div>
                     <h1># <em>1</em> - <em>${divide}</em><br>
                     <i id="mod_cpuinfo_usagecounter0">Avg. --%</i></h1>

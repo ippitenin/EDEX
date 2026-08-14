@@ -48,6 +48,9 @@ class Modal {
                 break;
         }
 
+        // NOTE: title, message and html are inserted as markup — several callers pass tags on
+        // purpose. Any caller embedding a file name, process name or error string must run it
+        // through window._escapeHtml first.
         let DOMstring = `<div id="modal_${this.id}" class="${this.classes}" style="z-index:${zindex+Object.keys(window.modals).length};" augmented-ui="${augs.join(" ")} exe">
             <h1>${this.title}</h1>
             ${this.type === "custom" ? options.html : "<h5>"+this.message+"</h5>"}

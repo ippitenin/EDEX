@@ -521,7 +521,8 @@ class FilesystemDisplay {
             if (document.getElementById("fs_space_bar").getAttribute("onclick") !== "" || fsBlock === null) return;
 
             let splitter = (process.platform === "win32") ? "\\" : "/";
-            let displayMount = (fsBlock.mount.length < 18) ? fsBlock.mount : "..."+splitter+fsBlock.mount.split(splitter).pop();
+            // Volume names travel with any mounted image, so treat them as untrusted.
+            let displayMount = window._escapeHtml((fsBlock.mount.length < 18) ? fsBlock.mount : "..."+splitter+fsBlock.mount.split(splitter).pop());
 
             // See #226
             if (!isNaN(fsBlock.use)) {
@@ -609,8 +610,8 @@ class FilesystemDisplay {
                             if (err) {
                                 new Modal({
                                     type: "info",
-                                    title: "Failed to load file: " + block.path,
-                                    html: err
+                                    title: "Failed to load file: " + window._escapeHtml(block.path),
+                                    html: window._escapeHtml(err)
                                 });
                                 console.log(err);
                             };
