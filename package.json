@@ -57,6 +57,7 @@
     },
     "forceCodeSigning": false,
     "npmRebuild": true,
+    "afterPack": "./build/afterPack.js",
     "artifactName": "EDEX-${os}-${arch}.${ext}",
     "linux": {
       "target": [

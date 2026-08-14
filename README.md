@@ -45,8 +45,10 @@ All changes are dated **2026-08-14** and are described per-commit in `git log`.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
-- **"Open in EDEX"** — a Finder quick action: right-click a folder, get a terminal in it.
-  If EDEX is already running the folder opens in a free tab. See [extras/](extras/).
+- **"Open in EDEX"** — right-click a folder in Finder, get a terminal in it. The entry sits in
+  the main context menu next to Terminal's own, and opens the folder in a free tab when EDEX is
+  already running. A small Swift agent embedded in the bundle publishes the service, since
+  Electron cannot register one itself. See [extras/](extras/).
 
 ## Requirements
 
