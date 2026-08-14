@@ -61,7 +61,6 @@ class Modal {
         this.close = () => {
             let modalElement = document.getElementById("modal_"+this.id);
             modalElement.setAttribute("class", "modal_popup "+this.type+" blink");
-            window.audioManager.denied.play();
             setTimeout(() => {
                 modalElement.remove();
                 delete window.modals[this.id];
@@ -97,17 +96,7 @@ class Modal {
             this.focus();
         });
 
-        switch(this.type) {
-            case "error":
-                window.audioManager.error.play();
-                break;
-            case "warning":
-                window.audioManager.alarm.play();
-                break;
-            default:
-                window.audioManager.info.play();
-                break;
-        }
+        // Modal open/close sounds disabled
         window.modals[this.id] = this;
         document.body.appendChild(element);
         this.focus();

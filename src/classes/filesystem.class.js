@@ -491,7 +491,7 @@ class FilesystemDisplay {
                 e.setAttribute("class", e.className.replace(" animationWait", ""));
 
                 if (window.settings.hideDotfiles !== true || e.className.indexOf("hidden") === -1) {
-                    window.audioManager.folder.play();
+                    // Filesystem refresh sound disabled
                     await _delay(30);
                 }
 

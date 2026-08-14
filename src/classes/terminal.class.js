@@ -194,8 +194,7 @@ class Terminal {
                 let d = Date.now();
 
                 if (d - this.lastSoundFX > 30) {
-                    if(window.passwordMode == "false")
-                        window.audioManager.stdout.play();
+                    // Terminal output sound disabled
                     this.lastSoundFX = d;
                 }
                 if (d - this.lastRefit > 10000) {
@@ -419,9 +418,9 @@ class Terminal {
                 this.onclosed(code, signal);
             });
 
+            this.wss = new this.Websocket({
                 // Bind to loopback only — never expose the terminal socket on the network
                 host: "127.0.0.1",
-            this.wss = new this.Websocket({
                 port: this.port,
                 clientTracking: true,
                 verifyClient: info => {

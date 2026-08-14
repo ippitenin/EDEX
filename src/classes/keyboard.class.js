@@ -180,8 +180,7 @@ class Keyboard {
 
                         // Keep focus on the terminal
                         if (window.keyboard.linkedToTerm) window.term[window.currentTerm].term.focus();
-                        if(this.container.dataset.passwordMode == "false")
-                            window.audioManager.stdin.play();
+                        // Key click sounds disabled (Enter keeps its own "granted" sound)
                         e.preventDefault();
                     };
                     key.onmouseup = e => {
@@ -310,11 +309,7 @@ class Keyboard {
                 key.setAttribute("class", "keyboard_key active");
             }
 
-            // See #516
-            if (e.repeat === false || (e.repeat === true && !e.code.startsWith('Shift') && !e.code.startsWith('Alt') && !e.code.startsWith('Control') && !e.code.startsWith('Caps'))) {
-                if(this.container.dataset.passwordMode == "false")
-                    window.audioManager.stdin.play();
-            }
+            // Key click sounds disabled (Enter keeps its own "granted" sound on keyup)
         };
 
         document.onkeydown = this.keydownHandler;
