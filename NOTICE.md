@@ -25,7 +25,8 @@ See the GNU General Public License for more details.
 
 ## Modifications
 
-Files carrying modifications relative to upstream v2.2.8 were changed on **2026-08-14**.
+Files carrying modifications relative to upstream v2.2.8 were changed on **2026-08-14** and
+**2026-08-15**.
 The changes are summarised in [README.md](README.md) and recorded individually in the commit
 history, as required by section 5(a) of the GPL.
 

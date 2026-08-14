@@ -16,7 +16,8 @@ sound on every keystroke.
 
 ## What is different from upstream
 
-All changes are dated **2026-08-14** and are described per-commit in `git log`.
+All changes are dated **2026-08-14** and **2026-08-15**, and are described per-commit in
+`git log`. The security review behind the second batch is written up in [AUDIT.md](AUDIT.md).
 
 ### Runtime and packaging
 - **Electron 12 → 43** (Chromium 89 → 150), electron-builder 22 → 26, `electron-rebuild` →
