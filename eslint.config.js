@@ -95,9 +95,7 @@ const edexGlobals = {
     fontsDir: "readonly",
     settingsFile: "readonly",
     shortcutsFile: "readonly",
-    lastWindowStateFile: "readonly",
-    // Loaded by ui.html as a plain script.
-    pdfjsLib: "readonly"
+    lastWindowStateFile: "readonly"
 };
 
 module.exports = [
