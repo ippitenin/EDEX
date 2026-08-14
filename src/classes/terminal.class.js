@@ -182,7 +182,11 @@ class Terminal {
                 this.term.loadAddon(attachAddon);
                 this.fit();
             };
-            this.socket.onerror = e => {throw JSON.stringify(e)};
+            this.socket.onerror = () => {
+                // The event object itself carries nothing useful — serialising it produced the
+                // infamous {"isTrusted":true} dialog. Say what actually went wrong instead.
+                throw new Error(`Cannot reach the terminal backend on port ${sockPort}. The tty process probably failed to start — check that the working directory still exists and is readable.`);
+            };
             this.socket.onclose = e => {
                 if (this.onclose) {
                     this.onclose(e);
@@ -346,12 +350,24 @@ class Terminal {
                     let pid = tty._pid;
                     switch(require("os").type()) {
                         case "Linux":
-                        case "Darwin":
                             require("child_process").exec(`ps -o comm --no-headers --sort=+pid -g ${pid} | tail -1`, (e, proc) => {
                                 if (e !== null) {
                                     reject(e);
                                 } else {
                                     resolve(proc.trim());
+                                }
+                            });
+                            break;
+                        case "Darwin":
+                            // BSD ps knows neither --no-headers nor --sort, so sort by pid here
+                            // and strip the path macOS returns in comm.
+                            require("child_process").exec(`ps -o pid=,comm= -g ${pid} | sort -n | tail -1`, (e, proc) => {
+                                if (e !== null) {
+                                    reject(e);
+                                } else {
+                                    let line = proc.trim();
+                                    let name = line.slice(line.indexOf(" ") + 1).trim();
+                                    resolve(name.split("/").pop());
                                 }
                             });
                             break;
