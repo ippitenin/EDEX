@@ -229,7 +229,7 @@ function displayLine() {
     }
 
     if (typeof log[i] === "undefined") {
-        setTimeout(displayTitleScreen, 300);
+        setTimeout(bootScreenDone, 300);
         return;
     }
 
@@ -270,6 +270,17 @@ function displayLine() {
         default:
             setTimeout(displayLine, Math.pow(1 - (i/1000), 3)*25);
     }
+}
+
+// Clean transition from the boot log straight to the UI, skipping the glitch title screen
+async function bootScreenDone() {
+    window.audioManager.theme.play();
+    await _delay(400);
+    document.getElementById("boot_screen").remove();
+    document.body.setAttribute("class", "");
+    initGraphicalErrorHandling();
+    initSystemInformationProxy();
+    waitForFonts().then(initUI);
 }
 
 // Show "logo" and background grid
