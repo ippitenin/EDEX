@@ -12,7 +12,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Открыть в EDEX</string>
+				<string>Open in EDEX</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>

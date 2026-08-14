@@ -1,35 +1,43 @@
 # Extras
 
-## «Открыть в EDEX» — быстрое действие Finder
+## "Open in EDEX" — Finder quick action
 
-Пункт контекстного меню Finder: правый клик по папке → **Открыть в EDEX** → терминал открывается сразу в этой папке.
-Если EDEX уже запущен, папка открывается в свободной вкладке, а не запускает второй экземпляр.
+Adds a Finder context-menu entry: right-click a folder → **Open in EDEX** → a terminal opens
+in that directory. If EDEX is already running, the folder opens in a free tab instead of
+launching a second instance.
 
-### Установка
+### Install
 
 ```sh
-cp -R "extras/Открыть в EDEX.workflow" ~/Library/Services/
+cp -R "extras/Open in EDEX.workflow" ~/Library/Services/
 ```
 
-Пункт появится в контекстном меню Finder сразу; перелогин не нужен.
-Если пункта не видно — включите его в `Системные настройки → Основные → Быстрые действия`
-(в старых версиях macOS: `Клавиатура → Быстрые действия`).
+The entry shows up in Finder's context menu right away — no logout needed. If you don't see
+it, enable it under `System Settings → General → Quick Actions` (older macOS:
+`Keyboard → Quick Actions`).
 
-### Что внутри
+### Renaming it
 
-Workflow — сервис Automator, привязанный к `public.folder` в Finder. Он вызывает:
+The menu entry takes its name from the workflow's filename, so rename the bundle to whatever
+suits your system language — `Открыть в EDEX.workflow`, `Im EDEX öffnen.workflow` — and the
+menu follows. For consistency, also update `NSMenuItem → default` in
+`Contents/Info.plist`; macOS falls back to it in some contexts.
+
+### Configuration
+
+The workflow shells out to:
 
 ```sh
 EDEX_BIN="/Applications/EDEX.app/Contents/MacOS/EDEX"
 ```
 
-Если приложение установлено не в `/Applications`, поправьте путь в `Contents/document.wflow`
-или откройте workflow в Automator и отредактируйте скрипт.
+If the app lives somewhere else, edit that path in `Contents/document.wflow`, or open the
+workflow in Automator and edit the script there.
 
-### Как это работает
+### How it works
 
-Запуск бинарника с путём к папке в аргументах обрабатывается в `src/_boot.js`:
+Launching the binary with a folder path in argv is handled in `src/_boot.js`:
 
-- при холодном старте `extractDirFromArgv()` подменяет стартовую директорию;
-- при уже запущенном приложении срабатывает `second-instance`, и путь уходит в окно
-  событием `open-dir-tab`, которое в `src/_renderer.js` открывает папку в свободной вкладке.
+- on a cold start, `extractDirFromArgv()` overrides the start directory;
+- if an instance is already running, `second-instance` fires and the path is forwarded to the
+  window as an `open-dir-tab` event, which `src/_renderer.js` opens in a free tab.

@@ -45,7 +45,7 @@ All changes are dated **2026-08-14** and are described per-commit in `git log`.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
-- **"Открыть в EDEX"** — a Finder quick action: right-click a folder, get a terminal in it.
+- **"Open in EDEX"** — a Finder quick action: right-click a folder, get a terminal in it.
   If EDEX is already running the folder opens in a free tab. See [extras/](extras/).
 
 ## Requirements
