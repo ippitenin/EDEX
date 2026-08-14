@@ -6,7 +6,7 @@ class DocReader {
         const scale = 1;
         const canvas = document.getElementById(modalElementId).querySelector(".pdf_canvas");
         const context = canvas.getContext('2d');
-        const loadingTask = pdfjsLib.getDocument(path);
+        const loadingTask = pdfjsLib.getDocument({url: path, isEvalSupported: false});
         let pdfDoc = null,
             pageNum = 1,
             pageRendering = false,
@@ -83,7 +83,7 @@ class DocReader {
         document.getElementById(modalElementId).querySelector(".zoom_in").addEventListener('click', this.zoomIn);
         document.getElementById(modalElementId).querySelector(".zoom_out").addEventListener('click', this.zoomOut);
 
-        pdfjsLib.getDocument(path).promise.then((pdfDoc_) => {
+        pdfjsLib.getDocument({url: path, isEvalSupported: false}).promise.then((pdfDoc_) => {
             pdfDoc = pdfDoc_;
             document.getElementById(modalElementId).querySelector(".page_count").textContent = pdfDoc.numPages;
             this.renderPage(pageNum);
