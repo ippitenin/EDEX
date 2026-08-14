@@ -2,7 +2,7 @@ window.modals = {};
 
 class Modal {
     constructor(options, onclose) {
-        if (!options || !options.type) throw "Missing parameters";
+        if (!options || !options.type) throw new Error("Modal: missing options.type");
 
         this.type = options.type;
         const {nanoid} = require("nanoid");

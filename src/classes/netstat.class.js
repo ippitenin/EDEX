@@ -1,6 +1,6 @@
 class Netstat {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Netstat: missing parentId");
 
         // Create DOM
         this.parent = document.getElementById(parentId);

@@ -1,6 +1,6 @@
 class Keyboard {
     constructor(opts) {
-        if (!opts.layout || !opts.container) throw "Missing options";
+        if (!opts.layout || !opts.container) throw new Error("Keyboard: missing opts.layout or opts.container");
 
         const layout = JSON.parse(require("fs").readFileSync(opts.layout, {encoding: "utf-8"}));
         this.ctrlseq = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];

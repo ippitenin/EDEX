@@ -1,7 +1,7 @@
 class Terminal {
     constructor(opts) {
         if (opts.role === "client") {
-            if (!opts.parentId) throw "Missing options";
+            if (!opts.parentId) throw new Error("Terminal: missing opts.parentId");
 
             this.xTerm = require("xterm").Terminal;
             const {AttachAddon} = require("xterm-addon-attach");
@@ -501,7 +501,7 @@ class Terminal {
                 this._closed = true;
             };
         } else {
-            throw "Unknown purpose";
+            throw new Error(`Terminal: unknown role ${opts.role}`);
         }
     }
 }

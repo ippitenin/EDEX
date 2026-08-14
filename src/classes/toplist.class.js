@@ -1,6 +1,6 @@
 class Toplist {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Toplist: missing parentId");
 
         // Create DOM
         this.parent = document.getElementById(parentId);

@@ -1,6 +1,6 @@
 class Conninfo {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Conninfo: missing parentId");
 
         // Create DOM
         this.parent = document.getElementById(parentId);

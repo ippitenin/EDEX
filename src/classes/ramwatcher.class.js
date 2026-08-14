@@ -1,6 +1,6 @@
 class RAMwatcher {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("RAMwatcher: missing parentId");
 
         // Create DOM
         this.parent = document.getElementById(parentId);
@@ -39,7 +39,7 @@ class RAMwatcher {
         if (this.currentlyUpdating) return;
         this.currentlyUpdating = true;
         window.si.mem().then(data => {
-            if (!data.total || !isFinite(data.free) || !isFinite(data.used)) throw("RAM Watcher Error: Bad memory values");
+            if (!data.total || !isFinite(data.free) || !isFinite(data.used)) throw new Error("RAMwatcher: unusable memory values");
 
             // Convert the data for the 440-points grid
             let active = Math.round((440*data.active)/data.total);

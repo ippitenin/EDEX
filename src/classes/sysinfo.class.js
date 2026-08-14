@@ -1,6 +1,6 @@
 class Sysinfo {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Sysinfo: missing parentId");
 
         // See #255
         let os;

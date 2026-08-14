@@ -1,6 +1,6 @@
 class Clock {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Clock: missing parentId");
 
         // Load settings
         this.twelveHours = (window.settings.clockHours === 12);

@@ -1,6 +1,6 @@
 class Cpuinfo {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Cpuinfo: missing parentId");
 
         // Create initial DOM
         this.parent = document.getElementById(parentId);
