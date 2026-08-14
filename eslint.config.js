@@ -70,7 +70,6 @@ const edexGlobals = {
     RAMwatcher: "readonly",
     Sysinfo: "readonly",
     Toplist: "readonly",
-    UpdateChecker: "readonly",
     si: "readonly",
     settings: "readonly",
     theme: "readonly",

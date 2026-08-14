@@ -506,8 +506,6 @@ async function initUI() {
     }
 
     await _delay(200);
-
-    window.updateCheck = new UpdateChecker();
 }
 
 window.themeChanger = theme => {
