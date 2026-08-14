@@ -7,6 +7,13 @@ at its call sites.
 Everything below is inherited from upstream eDEX-UI v2.2.8 unless noted. Findings are ordered by
 severity; each names the file, the data source, and how it goes wrong.
 
+**Status: all findings below are fixed**, apart from the two recorded as accepted (16) and
+deferred (out of scope). See `git log` for the commit that addresses each one, and `SMOKE.md`
+for what to re-check after a build.
+
+A second set of defects surfaced once ESLint was in place — they are listed under "Found while
+fixing" at the end.
+
 ## The multiplier
 
 The renderer runs with `nodeIntegration: true` and `contextIsolation: false`
@@ -154,6 +161,41 @@ pattern; meaningless as a boundary while node integration is on. Recorded, not f
 - Shell commands interpolate only numeric pids — no injection surface.
 - Timers: 20 intervals against 6 clears, but the difference is dashboard updaters that legitimately
   live for the process lifetime. Only finding 12 is a real leak.
+
+---
+
+## Found while fixing
+
+ESLint, added as part of this pass, immediately surfaced defects the reading missed. All fixed.
+
+### 17. Shell-type keyboard shortcuts never worked
+`src/classes/keyboard.class.js:384`
+
+`let fn = (cut.linebreak) ? writelr : write;` — the method names were written as bare
+identifiers rather than strings, so every shell shortcut threw a ReferenceError instead of
+typing its command. The feature was broken for as long as it has existed.
+
+### 18. Queued PDF page never rendered
+`src/classes/docReader.class.js:32`
+
+`renderPage(pageNumPending)` instead of `this.renderPage(…)`. Flipping pages faster than they
+render threw, and the queued page was dropped.
+
+### 19. Command injection through the fuzzy finder
+`src/classes/fuzzyFinder.class.js:128`
+
+The selected path was typed into the shell wrapped in hand-written single quotes. A file named
+`don't` broke the command; a file named `'; rm -rf ~; '` ran it. Now quoted through
+`quoteForShell`, which is covered by round-trip tests against `/bin/sh`.
+
+### 20. The minifier skipped most of the source tree
+`prebuild-minify.js:32,34`
+
+The `.json` and `file-icons-match.js` filters used `return`, which abandons the whole directory
+rather than skipping one file. Everything sorted after the first `.json` — including entire
+subdirectories — shipped unminified.
+
+---
 
 ## Out of scope
 
