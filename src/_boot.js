@@ -192,7 +192,6 @@ function createWindow(settings) {
         backgroundColor: '#000000',
         webPreferences: {
             devTools: true,
-	    enableRemoteModule: true,
             contextIsolation: false,
             backgroundThrottling: false,
             webSecurity: true,
@@ -244,6 +243,8 @@ app.on('ready', async () => {
     tty = new Terminal({
         role: "server",
         shell: settings.shell,
+    require('@electron/remote/main').enable(win.webContents);
+
         params: settings.shellArgs || '',
         cwd: settings.cwd,
         env: cleanEnv,
@@ -348,8 +349,7 @@ app.on('ready', async () => {
 
 app.on('web-contents-created', (e, contents) => {
     // Prevent creating more than one window
-    contents.on('new-window', (e, url) => {
-        e.preventDefault();
+    contents.setWindowOpenHandler(({url}) => {
         shell.openExternal(url);
     });
 
@@ -373,3 +373,4 @@ app.on('before-quit', () => {
     });
     signale.complete("Shutting down...");
 });
+        return {action: 'deny'};
