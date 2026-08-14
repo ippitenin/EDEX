@@ -33,21 +33,24 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GitSquared/edex-ui.git"
+    "url": "git+https://github.com/ippitenin/EDEX.git"
   },
   "author": "Gabriel 'Squared' SAILLARD <gabriel@saillard.dev> (https://gaby.dev)",
+  "contributors": [
+    "Ilya Pitenin (EDEX fork maintainer)"
+  ],
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/GitSquared/edex-ui/issues"
+    "url": "https://github.com/ippitenin/EDEX/issues"
   },
-  "homepage": "https://github.com/GitSquared/edex-ui#readme",
+  "homepage": "https://github.com/ippitenin/EDEX#readme",
   "build": {
     "appId": "com.edex.ui",
     "productName": "EDEX",
     "publish": "github",
     "asar": true,
     "compression": "normal",
-    "copyright": "Copyright © 2017-2021 Gabriel 'Squared' SAILLARD <gabriel@saillard.dev> (https://gaby.dev)",
+    "copyright": "Copyright © 2017-2021 Gabriel 'Squared' SAILLARD <gabriel@saillard.dev> (https://gaby.dev); modifications © 2026 Ilya Pitenin",
     "directories": {
       "output": "dist",
       "app": "prebuild-src"
@@ -63,7 +66,7 @@
       "icon": "media/linuxIcons"
     },
     "appImage": {
-      "artifactName": "eDEX-UI-Linux-${arch}.AppImage"
+      "artifactName": "EDEX-Linux-${arch}.AppImage"
     },
     "mac": {
       "target": [
@@ -93,7 +96,7 @@
       "icon": "media/icon.ico"
     },
     "nsis": {
-      "artifactName": "eDEX-UI-Windows-${arch}.exe",
+      "artifactName": "EDEX-Windows-${arch}.exe",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": true
