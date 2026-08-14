@@ -16,12 +16,24 @@ The entry shows up in Finder's context menu right away — no logout needed. If 
 it, enable it under `System Settings → General → Quick Actions` (older macOS:
 `Keyboard → Quick Actions`).
 
-### Renaming it
+### Localisation
 
-The menu entry takes its name from the workflow's filename, so rename the bundle to whatever
-suits your system language — `Открыть в EDEX.workflow`, `Im EDEX öffnen.workflow` — and the
-menu follows. For consistency, also update `NSMenuItem → default` in
-`Contents/Info.plist`; macOS falls back to it in some contexts.
+The entry follows the system language. `NSMenuItem` in `Contents/Info.plist` holds one key
+per locale, with `default` as the fallback:
+
+```xml
+<key>NSMenuItem</key>
+<dict>
+	<key>default</key>
+	<string>Open in EDEX</string>
+	<key>ru</key>
+	<string>Открыть в EDEX</string>
+</dict>
+```
+
+Add a key for any locale you want — `de`, `fr`, `ja`. This is the same mechanism Terminal
+uses for its own "New Terminal at Folder" service. After editing, reinstall the bundle and
+run `/System/Library/CoreServices/pbs -flush && killall Finder` to refresh the menu.
 
 ### Configuration
 
