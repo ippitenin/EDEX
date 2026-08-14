@@ -1,4 +1,8 @@
-# EDEX
+<p align="center">
+  <img src="media/edex-icon.png" alt="EDEX" width="180">
+</p>
+
+<h1 align="center">EDEX</h1>
 
 A maintained fork of [eDEX-UI](https://github.com/GitSquared/edex-ui) — the sci-fi desktop
 terminal — brought up to date and made usable as a daily driver on Apple Silicon.
