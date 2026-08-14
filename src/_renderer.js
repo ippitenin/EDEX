@@ -552,7 +552,13 @@ window.focusShellTab = (number, spawnDir) => {
         ipc.send("ttyspawn", spawnDir || "true");
         ipc.once("ttyspawn-reply", (e, r) => {
             if (r.startsWith("ERROR")) {
+                // Release the slot, otherwise the tab stays wedged on ERROR forever: the guard
+                // above only opens a tab whose entry is undefined, and this one would stay null.
                 document.getElementById("shell_tab"+number).innerHTML = "<p>ERROR</p>";
+                setTimeout(() => {
+                    delete window.term[number];
+                    document.getElementById("shell_tab"+number).innerHTML = "<p>EMPTY</p>";
+                }, 2000);
             } else if (r.startsWith("SUCCESS")) {
                 let port = Number(r.substr(9));
 
