@@ -2,12 +2,15 @@ window.modals = {};
 
 class Modal {
     constructor(options, onclose) {
-        if (!options || !options.type) throw "Missing parameters";
+        if (!options || !options.type) throw new Error("Modal: missing options.type");
 
         this.type = options.type;
-        this.id = require("nanoid").nanoid();
+        const {nanoid} = require("nanoid");
+        this.id = nanoid();
         while (typeof window.modals[this.id] !== "undefined") {
-            this.id = require("nanoid")();
+            // The collision branch called require("nanoid")() — nanoid 3 exports an object, so
+            // this threw a TypeError instead of retrying.
+            this.id = nanoid();
         }
         this.title = options.title || options.type || "Modal window";
         this.message = options.message || "Lorem ipsum dolor sit amet.";
@@ -48,6 +51,9 @@ class Modal {
                 break;
         }
 
+        // NOTE: title, message and html are inserted as markup — several callers pass tags on
+        // purpose. Any caller embedding a file name, process name or error string must run it
+        // through window._escapeHtml first.
         let DOMstring = `<div id="modal_${this.id}" class="${this.classes}" style="z-index:${zindex+Object.keys(window.modals).length};" augmented-ui="${augs.join(" ")} exe">
             <h1>${this.title}</h1>
             ${this.type === "custom" ? options.html : "<h5>"+this.message+"</h5>"}

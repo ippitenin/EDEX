@@ -1,7 +1,7 @@
 class Terminal {
     constructor(opts) {
         if (opts.role === "client") {
-            if (!opts.parentId) throw "Missing options";
+            if (!opts.parentId) throw new Error("Terminal: missing opts.parentId");
 
             this.xTerm = require("xterm").Terminal;
             const {AttachAddon} = require("xterm-addon-attach");
@@ -308,6 +308,13 @@ class Terminal {
             this.Websocket = require("ws").Server;
             this.Ipc = require("electron").ipcMain;
 
+            // Only reachable from the main process, where paths resolve against this
+            // directory. The client branch above runs in the renderer, where they would not.
+            const {isAllowedOrigin, parseProcessName, parseCwdOutput} = require("../utils/system.js");
+            this._isAllowedOrigin = isAllowedOrigin;
+            this._parseProcessName = parseProcessName;
+            this._parseCwdOutput = parseCwdOutput;
+
             this.renderer = null;
             this.port = opts.port || 3000;
 
@@ -336,7 +343,7 @@ class Terminal {
                                 if (e !== null) {
                                     reject(e);
                                 } else {
-                                    resolve(cwd.trim());
+                                    resolve(this._parseCwdOutput(cwd));
                                 }
                             });
                             break;
@@ -365,9 +372,7 @@ class Terminal {
                                 if (e !== null) {
                                     reject(e);
                                 } else {
-                                    let line = proc.trim();
-                                    let name = line.slice(line.indexOf(" ") + 1).trim();
-                                    resolve(name.split("/").pop());
+                                    resolve(this._parseProcessName(proc));
                                 }
                             });
                             break;
@@ -442,12 +447,9 @@ class Terminal {
                 verifyClient: info => {
                     // Single-client limit
                     if (this.wss.clients.length >= 1) return false;
-                    // Only the local EDEX renderer (loaded from file://) may connect.
-                    // Reject web-page origins (http/https/etc.) so a malicious site the
-                    // user visits in a browser cannot hijack the local terminal socket.
-                    let origin = info.origin;
-                    if (origin && origin !== "file://" && origin !== "null") return false;
-                    return true;
+                    // Only the local EDEX renderer, which loads from file://, may attach —
+                    // see isAllowedOrigin and its tests.
+                    return this._isAllowedOrigin(info.origin);
                 }
             });
             this.Ipc.on("terminal_channel-"+this.port, (e, ...args) => {
@@ -499,7 +501,7 @@ class Terminal {
                 this._closed = true;
             };
         } else {
-            throw "Unknown purpose";
+            throw new Error(`Terminal: unknown role ${opts.role}`);
         }
     }
 }

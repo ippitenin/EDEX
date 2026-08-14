@@ -1,12 +1,22 @@
+// pdf.js ships as ES modules since v4, so it is pulled in here rather than through a script
+// tag in ui.html. Electron's Node supports require() on ESM, and this keeps the library — and
+// its worker path — out of the global scope.
+const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.mjs");
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs";
+
 class DocReader {
     constructor(opts) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = './node_modules/pdfjs-dist/build/pdf.worker.js';
         const modalElementId = "modal_" + opts.modalId;
         const path = opts.path;
         const scale = 1;
         const canvas = document.getElementById(modalElementId).querySelector(".pdf_canvas");
         const context = canvas.getContext('2d');
-        const loadingTask = pdfjsLib.getDocument({url: path, isEvalSupported: false});
+        // isEvalSupported keeps a crafted PDF from running script through the font renderer
+        // (CVE-2024-4367); encoding the path keeps spaces and non-ASCII names loadable.
+        const loadingTask = pdfjsLib.getDocument({
+            url: window._encodePathURI(path),
+            isEvalSupported: false
+        });
         let pdfDoc = null,
             pageNum = 1,
             pageRendering = false,
@@ -26,10 +36,12 @@ class DocReader {
                         viewport: viewport,
                     };
                     const renderTask = page.render(renderContext);
-                    renderTask.promise.then(function () {
+                    renderTask.promise.then(() => {
                         pageRendering = false;
                         if (pageNumPending !== null) {
-                            renderPage(pageNumPending);
+                            // Was a bare renderPage(): an undefined identifier, so flipping
+                            // pages faster than they render threw instead of catching up.
+                            this.renderPage(pageNumPending);
                             pageNumPending = null;
                         }
                     });
@@ -83,7 +95,7 @@ class DocReader {
         document.getElementById(modalElementId).querySelector(".zoom_in").addEventListener('click', this.zoomIn);
         document.getElementById(modalElementId).querySelector(".zoom_out").addEventListener('click', this.zoomOut);
 
-        pdfjsLib.getDocument({url: path, isEvalSupported: false}).promise.then((pdfDoc_) => {
+        pdfjsLib.getDocument({url: window._encodePathURI(path), isEvalSupported: false}).promise.then((pdfDoc_) => {
             pdfDoc = pdfDoc_;
             document.getElementById(modalElementId).querySelector(".page_count").textContent = pdfDoc.numPages;
             this.renderPage(pageNum);

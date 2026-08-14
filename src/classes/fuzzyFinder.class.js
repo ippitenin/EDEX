@@ -125,7 +125,9 @@ class FuzzyFinder {
         
         let filePath = path.resolve(window.fsDisp.dirpath, file);
         
-          window.term[window.currentTerm].write(`'${filePath}'`);
+          // Wrapping in quotes by hand breaks on a file named  don't  and is an injection with
+          // a name like  '; rm -rf ~; '  — quote it properly instead.
+          window.term[window.currentTerm].write(window._quoteForShell(filePath));
           this.disp.close();
      }
 }

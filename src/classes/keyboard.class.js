@@ -1,6 +1,6 @@
 class Keyboard {
     constructor(opts) {
-        if (!opts.layout || !opts.container) throw "Missing options";
+        if (!opts.layout || !opts.container) throw new Error("Keyboard: missing opts.layout or opts.container");
 
         const layout = JSON.parse(require("fs").readFileSync(opts.layout, {encoding: "utf-8"}));
         this.ctrlseq = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
@@ -69,14 +69,16 @@ class Keyboard {
                     key.setAttribute("id", "keyboard_spacebar");
                 } else if (keyObj.cmd === "\r") {
                     key.setAttribute("class", "keyboard_key keyboard_enter");
-                    key.innerHTML = `<h1>${keyObj.name}</h1>`;
+                    key.innerHTML = `<h1>${window._escapeHtml(keyObj.name)}</h1>`;
                 } else {
+                    // Layouts are JSON files users download and drop into their keyboards
+                    // folder — the labels inside are untrusted input.
                     key.innerHTML = `
-                        <h5>${keyObj.altshift_name || ""}</h5>
-                        <h4>${keyObj.fn_name || ""}</h4>
-                        <h3>${keyObj.alt_name || ""}</h3>
-                        <h2>${keyObj.shift_name || ""}</h2>
-                        <h1>${keyObj.name || ""}</h1>`;
+                        <h5>${window._escapeHtml(keyObj.altshift_name || "")}</h5>
+                        <h4>${window._escapeHtml(keyObj.fn_name || "")}</h4>
+                        <h3>${window._escapeHtml(keyObj.alt_name || "")}</h3>
+                        <h2>${window._escapeHtml(keyObj.shift_name || "")}</h2>
+                        <h1>${window._escapeHtml(keyObj.name || "")}</h1>`;
                 }
 
                 // Icon support, overrides previously defined innerHTML
@@ -381,7 +383,9 @@ class Keyboard {
                     window.useAppShortcut(cut.action);
                     shortcutsTriggered = true;
                 } else if (cut.type === "shell") {
-                    let fn = (cut.linebreak) ? writelr : write;
+                    // These are method names, not variables — as written they were undefined
+                    // identifiers, so every shell-type shortcut threw instead of running.
+                    let fn = (cut.linebreak) ? "writelr" : "write";
                     window.term[window.currentTerm][fn](cut.action);
                 } else {
                     console.warn(`${cut.trigger} has unknown type`);

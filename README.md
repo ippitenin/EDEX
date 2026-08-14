@@ -16,7 +16,8 @@ sound on every keystroke.
 
 ## What is different from upstream
 
-All changes are dated **2026-08-14** and are described per-commit in `git log`.
+All changes are dated **2026-08-14** and **2026-08-15**, and are described per-commit in
+`git log`. The security review behind the second batch is written up in [AUDIT.md](AUDIT.md).
 
 ### Runtime and packaging
 - **Electron 12 → 43** (Chromium 89 → 150), electron-builder 22 → 26, `electron-rebuild` →
@@ -31,7 +32,22 @@ All changes are dated **2026-08-14** and are described per-commit in `git log`.
   the local renderer loaded from `file://`. Upstream listened on every interface and accepted
   whichever client connected first — the long-standing eDEX-UI exposure. Without the Origin
   check, a web page open in a browser could connect to the local port and drive the shell.
-- **`eval` disabled in the PDF viewer** (`isEvalSupported: false`), closing CVE-2024-4367.
+- **Untrusted values are escaped before they reach the DOM** — process names, volume labels,
+  keyboard layout files, error text. Upstream interpolated them raw, which with node
+  integration enabled meant a file named `<img src=x onerror=…>` executed code the moment it
+  was displayed. See [AUDIT.md](AUDIT.md).
+- **Paths typed into the shell are quoted properly**, so a file named `'; rm -rf ~; '` stays a
+  file name.
+- **pdf.js updated** from 2.16 to 4.10, with `eval` disabled in the viewer
+  (CVE-2024-4367). `npm audit` in `src/` reports no vulnerabilities.
+- **The update checker is gone.** It fetched releases from the upstream repository on every
+  launch and dropped the response into modal markup, `onclick` handler included.
+
+**Known limitation:** the renderer still runs with `nodeIntegration: true` and
+`contextIsolation: false`, inherited from upstream. The injection paths above are closed, but
+the architecture offers no second line of defence — treat the app as trusting whatever you
+open with it. Moving to a preload bridge is a rewrite of the window-to-main plumbing and has
+not been attempted.
 
 ### Interface
 - Renamed to EDEX throughout; settings live in `~/Library/Application Support/EDEX` and are
@@ -63,6 +79,15 @@ macOS arm64.
 npm run install-darwin   # installs deps and rebuilds node-pty against Electron's ABI
 npm start
 ```
+
+## Checks
+
+```sh
+npm run lint   # ESLint, tuned for real defects rather than style
+npm test       # unit tests on node:test — escaping, shell quoting, argv and origin checks
+```
+
+Anything that needs a running app is in [SMOKE.md](SMOKE.md); run through it after a build.
 
 ## Building a distributable
 

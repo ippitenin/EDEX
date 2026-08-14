@@ -376,7 +376,28 @@ app.on('ready', async () => {
             };
 
             extraTtys[port] = term;
-            e.sender.send("ttyspawn-reply", "SUCCESS: "+port);
+
+            // Answer only once the socket is actually accepting connections. Replying straight
+            // after the constructor raced the bind: the renderer connected to a port nobody was
+            // listening on yet, and the refusal surfaced as an unexplained error dialog.
+            let replied = false;
+            const reply = message => {
+                if (replied) return;
+                replied = true;
+                e.sender.send("ttyspawn-reply", message);
+            };
+
+            if (term.wss.address()) {
+                reply("SUCCESS: "+port);
+            } else {
+                term.wss.once("listening", () => reply("SUCCESS: "+port));
+            }
+
+            term.wss.once("error", err => {
+                signale.error(`TTY ${port} could not open its socket:`, err.message);
+                if (extraTtys[port] === term) extraTtys[port] = null;
+                reply("ERROR: "+err.message);
+            });
         }
     });
 

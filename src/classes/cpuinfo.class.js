@@ -1,6 +1,6 @@
 class Cpuinfo {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Cpuinfo: missing parentId");
 
         // Create initial DOM
         this.parent = document.getElementById(parentId);
@@ -24,7 +24,7 @@ class Cpuinfo {
 
             let innercontainer = document.createElement("div");
             innercontainer.setAttribute("id", "mod_cpuinfo_innercontainer");
-            innercontainer.innerHTML = `<h1>CPU USAGE<i>${cpuName}</i></h1>
+            innercontainer.innerHTML = `<h1>CPU USAGE<i>${window._escapeHtml(cpuName)}</i></h1>
                 <div>
                     <h1># <em>1</em> - <em>${divide}</em><br>
                     <i id="mod_cpuinfo_usagecounter0">Avg. --%</i></h1>
@@ -55,7 +55,7 @@ class Cpuinfo {
                 </div>`;
             this.container.append(innercontainer);
 
-            for (var i = 0; i < 2; i++) {
+            for (let i = 0; i < 2; i++) {
                 this.charts.push(new SmoothieChart({
                     limitFPS: 30,
                     responsive: true,
@@ -75,7 +75,7 @@ class Cpuinfo {
                 }));
             }
 
-            for (var i = 0; i < data.cores; i++) {
+            for (let i = 0; i < data.cores; i++) {
                 // Create TimeSeries
                 this.series.push(new TimeSeries());
 
@@ -92,7 +92,7 @@ class Cpuinfo {
                 }
             }
 
-            for (var i = 0; i < 2; i++) {
+            for (let i = 0; i < 2; i++) {
                 this.charts[i].streamTo(document.getElementById(`mod_cpuinfo_canvas_${i}`), 500);
             }
 

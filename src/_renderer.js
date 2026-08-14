@@ -2,26 +2,13 @@
 window.eval = global.eval = function () {
     throw new Error("eval() is disabled for security reasons.");
 };
-// Security helper :)
-window._escapeHtml = text => {
-    let map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => {return map[m];});
-};
+// Security helpers — implementations and their tests live in utils/sanitize.js
+const {escapeHtml, purifyCSS, quoteForShell} = require("./utils/sanitize.js");
+window._escapeHtml = escapeHtml;
+window._purifyCSS = purifyCSS;
+window._quoteForShell = quoteForShell;
 window._encodePathURI = uri => {
     return encodeURI(uri).replace(/#/g, "%23");
-};
-window._purifyCSS = str => {
-    if (typeof str === "undefined") return "";
-    if (typeof str !== "string") {
-        str = str.toString();
-    }
-    return str.replace(/[<]/g, "");
 };
 window._delay = ms => {
     return new Promise((resolve, reject) => {
@@ -31,7 +18,8 @@ window._delay = ms => {
 
 // Initiate basic error handling
 window.onerror = (msg, path, line, col, error) => {
-    document.getElementById("boot_screen").innerHTML += `${error} :  ${msg}<br/>==> at ${path}  ${line}:${col}`;
+    // Error text routinely quotes file names, so it is untrusted input like any other.
+    document.getElementById("boot_screen").innerHTML += `${escapeHtml(error)} :  ${escapeHtml(msg)}<br/>==> at ${escapeHtml(path)}  ${escapeHtml(line)}:${escapeHtml(col)}`;
 };
 
 const path = require("path");
@@ -142,10 +130,11 @@ window._loadTheme = theme => {
 function initGraphicalErrorHandling() {
     window.edexErrorsModals = [];
     window.onerror = (msg, path, line, col, error) => {
+        // Error text quotes file names, so escape before it reaches the modal's markup.
         let errorModal = new Modal({
             type: "error",
-            title: error,
-            message: `${msg}<br/>        at ${path}  ${line}:${col}`
+            title: escapeHtml(error),
+            message: `${escapeHtml(msg)}<br/>        at ${escapeHtml(path)}  ${escapeHtml(line)}:${escapeHtml(col)}`
         });
         window.edexErrorsModals.push(errorModal);
 
@@ -397,7 +386,7 @@ async function initUI() {
 
     getDisplayName().then(user => {
         if (user) {
-            greeter.innerHTML += `Welcome back, <em>${user}</em>`;
+            greeter.innerHTML += `Welcome back, <em>${escapeHtml(user)}</em>`;
         } else {
             greeter.innerHTML += "Welcome back";
         }
@@ -492,7 +481,8 @@ async function initUI() {
     };
     window.currentTerm = 0;
     window.term[0].onprocesschange = p => {
-        document.getElementById("shell_tab0").innerHTML = `<p>MAIN - ${p}</p>`;
+        // Process names come from the OS and can contain anything, markup included.
+        document.getElementById("shell_tab0").innerHTML = `<p>MAIN - ${escapeHtml(p)}</p>`;
     };
     // Prevent losing hardware keyboard focus on the terminal when using touch keyboard
     window.onmouseup = e => {
@@ -516,8 +506,6 @@ async function initUI() {
     }
 
     await _delay(200);
-
-    window.updateCheck = new UpdateChecker();
 }
 
 window.themeChanger = theme => {
@@ -564,7 +552,13 @@ window.focusShellTab = (number, spawnDir) => {
         ipc.send("ttyspawn", spawnDir || "true");
         ipc.once("ttyspawn-reply", (e, r) => {
             if (r.startsWith("ERROR")) {
+                // Release the slot, otherwise the tab stays wedged on ERROR forever: the guard
+                // above only opens a tab whose entry is undefined, and this one would stay null.
                 document.getElementById("shell_tab"+number).innerHTML = "<p>ERROR</p>";
+                setTimeout(() => {
+                    delete window.term[number];
+                    document.getElementById("shell_tab"+number).innerHTML = "<p>EMPTY</p>";
+                }, 2000);
             } else if (r.startsWith("SUCCESS")) {
                 let port = Number(r.substr(9));
 
@@ -584,7 +578,7 @@ window.focusShellTab = (number, spawnDir) => {
                 };
 
                 window.term[number].onprocesschange = p => {
-                    document.getElementById("shell_tab"+number).innerHTML = `<p>#${number+1} - ${p}</p>`;
+                    document.getElementById("shell_tab"+number).innerHTML = `<p>#${number+1} - ${escapeHtml(p)}</p>`;
                 };
 
                 document.getElementById("shell_tab"+number).innerHTML = `<p>::${port}</p>`;

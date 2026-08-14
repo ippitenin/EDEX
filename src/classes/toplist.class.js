@@ -1,6 +1,6 @@
 class Toplist {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("Toplist: missing parentId");
 
         // Create DOM
         this.parent = document.getElementById(parentId);
@@ -47,8 +47,10 @@ class Toplist {
             });
             list.forEach(proc => {
                 let el = document.createElement("tr");
+                // Process names are attacker-controlled: anyone who can name a file can put
+                // markup here, and the renderer executes it with node integration on.
                 el.innerHTML = `<td>${proc.pid}</td>
-                                <td><strong>${proc.name}</strong></td>
+                                <td><strong>${window._escapeHtml(proc.name)}</strong></td>
                                 <td>${Math.round(proc.cpu*10)/10}%</td>
                                 <td>${Math.round(proc.mem*10)/10}%</td>`;
                 document.getElementById("mod_toplist_table").append(el);
@@ -61,6 +63,7 @@ class Toplist {
         let sortKey;
         let ascending = false;
         let removed = false;
+        let updateInterval = null;
         let currentlyUpdating = false;
 
         function setSortKey(fieldName){
@@ -178,12 +181,12 @@ class Toplist {
                     list.forEach(proc => {
                         let el = document.createElement("tr");
                         el.innerHTML = `<td class="pid">${proc.pid}</td>
-                            <td class="name">${proc.name}</td>
-                            <td class="user">${proc.user}</td>
+                            <td class="name">${window._escapeHtml(proc.name)}</td>
+                            <td class="user">${window._escapeHtml(proc.user)}</td>
                             <td class="cpu">${Math.round(proc.cpu * 10) / 10}%</td>
                             <td class="mem">${Math.round(proc.mem * 10) / 10}%</td>
-                            <td class="state">${proc.state}</td>
-                            <td class="started">${proc.started}</td>
+                            <td class="state">${window._escapeHtml(proc.state)}</td>
+                            <td class="started">${window._escapeHtml(proc.started)}</td>
                             <td class="runtime">${formatRuntime(proc.runtime)}</td>`;
                         document.getElementById("processList").append(el);
                     });
@@ -216,7 +219,7 @@ class Toplist {
             },
             () => {
                 removed = true;
-                //clearInterval(updateInterval);
+                clearInterval(updateInterval);
             }
         );
 
@@ -237,7 +240,7 @@ class Toplist {
         updateProcessList();
         window.keyboard.attach();
         window.term[window.currentTerm].term.focus();
-        var updateInterval = setInterval(updateProcessList, 1000);
+        updateInterval = setInterval(updateProcessList, 1000);
     }
 }
 

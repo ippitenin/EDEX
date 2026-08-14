@@ -1,6 +1,6 @@
 class LocationGlobe {
     constructor(parentId) {
-        if (!parentId) throw "Missing parameters";
+        if (!parentId) throw new Error("LocationGlobe: missing parentId");
 
         const path = require("path");
 
