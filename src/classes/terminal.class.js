@@ -419,15 +419,20 @@ class Terminal {
                 this.onclosed(code, signal);
             });
 
+                // Bind to loopback only — never expose the terminal socket on the network
+                host: "127.0.0.1",
             this.wss = new this.Websocket({
                 port: this.port,
                 clientTracking: true,
                 verifyClient: info => {
-                    if (this.wss.clients.length >= 1) {
-                        return false;
-                    } else {
-                        return true;
-                    }
+                    // Single-client limit
+                    if (this.wss.clients.length >= 1) return false;
+                    // Only the local EDEX renderer (loaded from file://) may connect.
+                    // Reject web-page origins (http/https/etc.) so a malicious site the
+                    // user visits in a browser cannot hijack the local terminal socket.
+                    let origin = info.origin;
+                    if (origin && origin !== "file://" && origin !== "null") return false;
+                    return true;
                 }
             });
             this.Ipc.on("terminal_channel-"+this.port, (e, ...args) => {
