@@ -5,9 +5,12 @@ class Modal {
         if (!options || !options.type) throw "Missing parameters";
 
         this.type = options.type;
-        this.id = require("nanoid").nanoid();
+        const {nanoid} = require("nanoid");
+        this.id = nanoid();
         while (typeof window.modals[this.id] !== "undefined") {
-            this.id = require("nanoid")();
+            // The collision branch called require("nanoid")() — nanoid 3 exports an object, so
+            // this threw a TypeError instead of retrying.
+            this.id = nanoid();
         }
         this.title = options.title || options.type || "Modal window";
         this.message = options.message || "Lorem ipsum dolor sit amet.";

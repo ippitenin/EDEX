@@ -55,7 +55,7 @@ class Cpuinfo {
                 </div>`;
             this.container.append(innercontainer);
 
-            for (var i = 0; i < 2; i++) {
+            for (let i = 0; i < 2; i++) {
                 this.charts.push(new SmoothieChart({
                     limitFPS: 30,
                     responsive: true,
@@ -75,7 +75,7 @@ class Cpuinfo {
                 }));
             }
 
-            for (var i = 0; i < data.cores; i++) {
+            for (let i = 0; i < data.cores; i++) {
                 // Create TimeSeries
                 this.series.push(new TimeSeries());
 
@@ -92,7 +92,7 @@ class Cpuinfo {
                 }
             }
 
-            for (var i = 0; i < 2; i++) {
+            for (let i = 0; i < 2; i++) {
                 this.charts[i].streamTo(document.getElementById(`mod_cpuinfo_canvas_${i}`), 500);
             }
 

@@ -26,10 +26,12 @@ class DocReader {
                         viewport: viewport,
                     };
                     const renderTask = page.render(renderContext);
-                    renderTask.promise.then(function () {
+                    renderTask.promise.then(() => {
                         pageRendering = false;
                         if (pageNumPending !== null) {
-                            renderPage(pageNumPending);
+                            // Was a bare renderPage(): an undefined identifier, so flipping
+                            // pages faster than they render threw instead of catching up.
+                            this.renderPage(pageNumPending);
                             pageNumPending = null;
                         }
                     });

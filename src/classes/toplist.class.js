@@ -63,6 +63,7 @@ class Toplist {
         let sortKey;
         let ascending = false;
         let removed = false;
+        let updateInterval = null;
         let currentlyUpdating = false;
 
         function setSortKey(fieldName){
@@ -218,7 +219,7 @@ class Toplist {
             },
             () => {
                 removed = true;
-                //clearInterval(updateInterval);
+                clearInterval(updateInterval);
             }
         );
 
@@ -239,7 +240,7 @@ class Toplist {
         updateProcessList();
         window.keyboard.attach();
         window.term[window.currentTerm].term.focus();
-        var updateInterval = setInterval(updateProcessList, 1000);
+        updateInterval = setInterval(updateProcessList, 1000);
     }
 }
 

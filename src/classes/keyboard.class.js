@@ -383,7 +383,9 @@ class Keyboard {
                     window.useAppShortcut(cut.action);
                     shortcutsTriggered = true;
                 } else if (cut.type === "shell") {
-                    let fn = (cut.linebreak) ? writelr : write;
+                    // These are method names, not variables — as written they were undefined
+                    // identifiers, so every shell-type shortcut threw instead of running.
+                    let fn = (cut.linebreak) ? "writelr" : "write";
                     window.term[window.currentTerm][fn](cut.action);
                 } else {
                     console.warn(`${cut.trigger} has unknown type`);

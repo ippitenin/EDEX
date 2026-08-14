@@ -47,13 +47,21 @@ class Netstat {
         };
         let geolite2 = require("geolite2-redist");
         let maxmind = require("maxmind");
+        // GeoIP is a nicety: it labels connections on the globe. Failing to fetch or open the
+        // database — no network, disk full, a bad download — used to be rethrown into the global
+        // handler and greeted the user with an error dialog over the terminal. Log it and carry
+        // on with the no-op lookup installed above.
         geolite2.downloadDbs(require("path").join(require("@electron/remote").app.getPath("userData"), "geoIPcache")).then(() => {
-           geolite2.open('GeoLite2-City', path => {
+            geolite2.open('GeoLite2-City', path => {
                 return maxmind.open(path);
-            }).catch(e => {throw e}).then(lookup => {
+            }).then(lookup => {
                 this.geoLookup = lookup;
                 this.lastconn.finished = true;
+            }).catch(e => {
+                console.warn("Netstat: GeoIP database unavailable, connection locations disabled.", e);
             });
+        }).catch(e => {
+            console.warn("Netstat: could not download the GeoIP database.", e);
         });
     }
     updateInfo() {
