@@ -13,17 +13,16 @@
 			<dict>
 				<key>default</key>
 				<string>Open in EDEX</string>
+				<key>ru</key>
+				<string>Открыть в EDEX</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
-			<key>NSRequiredContext</key>
-			<dict>
-				<key>NSApplicationIdentifier</key>
-				<string>com.apple.finder</string>
-			</dict>
 			<key>NSSendFileTypes</key>
 			<array>
+				<string>public.directory</string>
 				<string>public.folder</string>
+				<string>com.apple.resolvable</string>
 			</array>
 		</dict>
 	</array>
