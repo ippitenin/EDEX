@@ -42,3 +42,6 @@ jspm_packages
 dist
 prebuild-src
 src/node_modules
+
+# macOS
+.DS_Store
