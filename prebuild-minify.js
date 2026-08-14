@@ -29,9 +29,12 @@ async function recursiveMinify(dirPath) {
             if (fs.statSync(filePath).isFile()) {
 
                 // Do not process grid.json because it's heavy and pre-minified, and themes and keyboard files to leave them in a human-readable state
-                if (filePath.endsWith(".json") && !filePath.endsWith("icons.json")) return;
+                // `continue`, not `return`: returning abandoned the rest of the directory, so
+                // everything alphabetically after the first .json went unminified — including
+                // whole subdirectories.
+                if (filePath.endsWith(".json") && !filePath.endsWith("icons.json")) continue;
                 // See #446
-                if (filePath.endsWith("file-icons-match.js")) return;
+                if (filePath.endsWith("file-icons-match.js")) continue;
                 await stdout.write(filePath.slice(filePath.indexOf('prebuild-src/')+13)+'...');
 
                 switch (filePath.split(".").pop()) {
