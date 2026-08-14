@@ -1,9 +1,25 @@
 const signale = require("signale");
 const {app, BrowserWindow, dialog, shell} = require("electron");
 
+// Keep config under EDEX; migrate from the historical eDEX-UI folder if present
+{
+    const _fs = require("fs");
+    const _path = require("path");
+    const _newUserData = _path.join(app.getPath("appData"), "EDEX");
+    const _oldUserData = _path.join(app.getPath("appData"), "eDEX-UI");
+    try {
+        if (!_fs.existsSync(_newUserData) && _fs.existsSync(_oldUserData)) {
+            _fs.renameSync(_oldUserData, _newUserData);
+        }
+    } catch(e) {
+        // Migration is best-effort; fall back to a fresh config dir
+    }
+    app.setPath("userData", _newUserData);
+}
+
 process.on("uncaughtException", e => {
     signale.fatal(e);
-    dialog.showErrorBox("eDEX-UI crashed", e.message || "Cannot retrieve error message.");
+    dialog.showErrorBox("EDEX crashed", e.message || "Cannot retrieve error message.");
     if (tty) {
         tty.close();
     }
@@ -17,13 +33,13 @@ process.on("uncaughtException", e => {
     process.exit(1);
 });
 
-signale.start(`Starting eDEX-UI v${app.getVersion()}`);
+signale.start(`Starting EDEX v${app.getVersion()}`);
 signale.info(`With Node ${process.versions.node} and Electron ${process.versions.electron}`);
 signale.info(`Renderer is Chrome ${process.versions.chrome}`);
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-    signale.fatal("Error: Another instance of eDEX is already running. Cannot proceed.");
+    signale.fatal("Error: Another instance of EDEX is already running. Cannot proceed.");
     app.exit(1);
 }
 
@@ -178,7 +194,7 @@ function createWindow(settings) {
     let {x, y, width, height} = display.bounds;
     width++; height++;
     win = new BrowserWindow({
-        title: "eDEX-UI",
+        title: "EDEX",
         x,
         y,
         width,
@@ -235,8 +251,9 @@ app.on('ready', async () => {
     Object.assign(cleanEnv, {
         TERM: "xterm-256color",
         COLORTERM: "truecolor",
-        TERM_PROGRAM: "eDEX-UI",
-        TERM_PROGRAM_VERSION: app.getVersion()
+        TERM_PROGRAM: "EDEX",
+        TERM_PROGRAM_VERSION: app.getVersion(),
+        LANG: cleanEnv.LANG || "ru_RU.UTF-8"
     }, settings.env);
 
     signale.pending(`Creating new terminal process on port ${settings.port || '3000'}`);

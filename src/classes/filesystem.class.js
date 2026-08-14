@@ -406,27 +406,27 @@ class FilesystemDisplay {
                         break;
                     case "edex-theme":
                         icon = this.edexIcons.theme;
-                        type = "eDEX-UI theme";
+                        type = "EDEX theme";
                         break;
                     case "edex-kblayout":
                         icon = this.edexIcons.kblayout;
-                        type = "eDEX-UI keyboard layout";
+                        type = "EDEX keyboard layout";
                         break;
                     case "edex-settings":
                     case "edex-shortcuts":
                         icon = this.edexIcons.settings;
-                        type = "eDEX-UI config file";
+                        type = "EDEX config file";
                         break;
                     case "system":
                         icon = this.edexIcons.settings;
                         break;
                     case "edex-themesDir":
                         icon = this.edexIcons.themesDir;
-                        type = "eDEX-UI themes folder";
+                        type = "EDEX themes folder";
                         break;
                     case "edex-kblayoutsDir":
                         icon = this.edexIcons.kblayoutsDir;
-                        type = "eDEX-UI keyboards folder";
+                        type = "EDEX keyboards folder";
                         break;
                     default:
                         let iconName = this.fileIconsMatcher(e.name);

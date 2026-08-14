@@ -1,6 +1,6 @@
 {
   "name": "edex-ui",
-  "productName": "eDEX-UI",
+  "productName": "EDEX",
   "version": "2.2.8",
   "description": "A science fiction desktop running everywhere. Awesome.",
   "keywords": [
@@ -43,7 +43,7 @@
   "homepage": "https://github.com/GitSquared/edex-ui#readme",
   "build": {
     "appId": "com.edex.ui",
-    "productName": "eDEX-UI",
+    "productName": "EDEX",
     "publish": "github",
     "asar": true,
     "compression": "normal",
@@ -54,7 +54,7 @@
     },
     "forceCodeSigning": false,
     "npmRebuild": true,
-    "artifactName": "eDEX-UI-${os}-${arch}.${ext}",
+    "artifactName": "EDEX-${os}-${arch}.${ext}",
     "linux": {
       "target": [
         "AppImage"
@@ -78,7 +78,7 @@
       "icon": "media/icon.icns"
     },
     "dmg": {
-      "artifactName": "eDEX-UI-macOS-${arch}.dmg"
+      "artifactName": "EDEX-macOS-${arch}.dmg"
     },
     "win": {
       "target": [

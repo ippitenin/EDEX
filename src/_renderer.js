@@ -288,7 +288,7 @@ async function displayTitleScreen() {
 
     document.body.setAttribute("class", "");
     bootScreen.setAttribute("class", "center");
-    bootScreen.innerHTML = "<h1>eDEX-UI</h1>";
+    bootScreen.innerHTML = "<h1>EDEX</h1>";
     let title = document.querySelector("section > h1");
 
     await _delay(200);
