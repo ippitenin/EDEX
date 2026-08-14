@@ -536,8 +536,8 @@ window.remakeKeyboard = layout => {
     ipc.send("setKbOverride", layout);
 };
 
-window.focusShellTab = number => {
-    window.audioManager.folder.play();
+window.focusShellTab = (number, spawnDir) => {
+    // Tab switch sound disabled
 
     if (number !== window.currentTerm && window.term[number]) {
         window.currentTerm = number;
@@ -561,7 +561,7 @@ window.focusShellTab = number => {
         window.term[number] = null;
 
         document.getElementById("shell_tab"+number).innerHTML = "<p>LOADING...</p>";
-        ipc.send("ttyspawn", "true");
+        ipc.send("ttyspawn", spawnDir || "true");
         ipc.once("ttyspawn-reply", (e, r) => {
             if (r.startsWith("ERROR")) {
                 document.getElementById("shell_tab"+number).innerHTML = "<p>ERROR</p>";
@@ -595,6 +595,22 @@ window.focusShellTab = number => {
         });
     }
 };
+
+// Open a folder from the Finder "Open in EDEX" quick action in a free tab
+ipc.on("open-dir-tab", (e, dir) => {
+    if (!window.term) return;
+    for (let i = 1; i <= 4; i++) {
+        if (window.term[i] !== null && typeof window.term[i] !== "object") {
+            window.focusShellTab(i, dir);
+            return;
+        }
+    }
+    new Modal({
+        type: "info",
+        title: "No free tabs",
+        message: `All terminal tabs are in use.<br/>Close one to open:<br/>${window._escapeHtml(dir)}`
+    });
+});
 
 // Settings editor
 window.openSettings = async () => {

@@ -37,11 +37,36 @@ signale.start(`Starting EDEX v${app.getVersion()}`);
 signale.info(`With Node ${process.versions.node} and Electron ${process.versions.electron}`);
 signale.info(`Renderer is Chrome ${process.versions.chrome}`);
 
+// Extract an absolute directory path from a command line (used by the Finder "Open in EDEX" action)
+function extractDirFromArgv(argv) {
+    for (let i = argv.length - 1; i > 0; i--) {
+        const a = argv[i];
+        if (typeof a === "string" && !a.startsWith("-") && require("path").isAbsolute(a)) {
+            try {
+                if (require("fs").statSync(a).isDirectory()) return a;
+            } catch(e) {
+                // Not a directory, keep looking
+            }
+        }
+    }
+    return null;
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
     signale.fatal("Error: Another instance of EDEX is already running. Cannot proceed.");
     app.exit(1);
 }
+
+// A second launch with a folder argument opens that folder in a new tab of the running instance
+app.on("second-instance", (e, argv) => {
+    const dir = extractDirFromArgv(argv);
+    if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+        if (dir) win.webContents.send("open-dir-tab", dir);
+    }
+});
 
 signale.time("Startup");
 
@@ -218,6 +243,8 @@ function createWindow(settings) {
         }
     });
 
+    require('@electron/remote/main').enable(win.webContents);
+
     win.loadURL(url.format({
         pathname: path.join(__dirname, 'ui.html'),
         protocol: 'file:',
@@ -238,6 +265,13 @@ function createWindow(settings) {
 app.on('ready', async () => {
     signale.pending(`Loading settings file...`);
     let settings = require(settingsFile);
+
+    // Folder passed on the command line (Finder "Open in EDEX") overrides the start directory for this launch
+    const startDir = extractDirFromArgv(process.argv);
+    if (startDir) {
+        settings.cwd = startDir;
+        signale.info(`Start directory overridden by command line: ${startDir}`);
+    }
     signale.pending(`Resolving shell path...`);
     settings.shell = await which(settings.shell).catch(e => { throw(e) });
     signale.info(`Shell found at ${settings.shell}`);
@@ -260,8 +294,6 @@ app.on('ready', async () => {
     tty = new Terminal({
         role: "server",
         shell: settings.shell,
-    require('@electron/remote/main').enable(win.webContents);
-
         params: settings.shellArgs || '',
         cwd: settings.cwd,
         env: cleanEnv,
@@ -314,11 +346,12 @@ app.on('ready', async () => {
             e.sender.send("ttyspawn-reply", "ERROR: max number of ttys reached");
         } else {
             signale.pending(`Creating new TTY process on port ${port}`);
+            let spawnCwd = (typeof arg === "string" && arg !== "true" && fs.existsSync(arg)) ? arg : (tty.tty._cwd || settings.cwd);
             let term = new Terminal({
                 role: "server",
                 shell: settings.shell,
                 params: settings.shellArgs || '',
-                cwd: tty.tty._cwd || settings.cwd,
+                cwd: spawnCwd,
                 env: cleanEnv,
                 port: port
             });
@@ -368,6 +401,7 @@ app.on('web-contents-created', (e, contents) => {
     // Prevent creating more than one window
     contents.setWindowOpenHandler(({url}) => {
         shell.openExternal(url);
+        return {action: 'deny'};
     });
 
     // Prevent loading something else than the UI
@@ -390,4 +424,3 @@ app.on('before-quit', () => {
     });
     signale.complete("Shutting down...");
 });
-        return {action: 'deny'};
