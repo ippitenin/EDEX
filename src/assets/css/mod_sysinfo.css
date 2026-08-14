@@ -5,9 +5,9 @@ div#mod_sysinfo {
     justify-content: space-between;
     height: 5.556vh;
     border-top: 0.092vh solid rgba(var(--color_r), var(--color_g), var(--color_b), 0.3);
-    font-size: 1.111vh;
+    font-size: min(1.111vh, 0.625vw);
     font-family: var(--font_main_light);
-    letter-spacing: 0.092vh;
+    letter-spacing: min(0.092vh, 0.052vw);
 }
 
 div#mod_sysinfo::before {
@@ -31,7 +31,8 @@ div#mod_sysinfo::after {
 div#mod_sysinfo div {
     height: 100%;
     box-sizing: border-box;
-    padding: 0.925vh 0.46vh;
+    padding: 0.925vh min(0.46vh, 0.26vw);
+    white-space: nowrap;
     display: flex;
     flex-direction: column;
     align-items: flex-start;

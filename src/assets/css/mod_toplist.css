@@ -1,7 +1,7 @@
 div#mod_toplist {
     border-top: 0.092vh solid rgba(var(--color_r), var(--color_g), var(--color_b), 0.3);
     font-family: var(--font_main_light);
-    letter-spacing: 0.092vh;
+    letter-spacing: min(0.092vh, 0.052vw);
     padding: 0.645vh 0vh;
     display: flex;
     flex-wrap: wrap;
@@ -31,7 +31,7 @@ div#mod_toplist::after {
 }
 
 div#mod_toplist h1 {
-    font-size: 1.48vh;
+    font-size: min(1.48vh, 0.8325vw);
     margin: 0vh;
     margin-bottom: -1vh;
     width: 97%;
@@ -40,7 +40,7 @@ div#mod_toplist h1 {
 
 div#mod_toplist i {
     font-style: normal;
-    font-size: 1.20vh;
+    font-size: min(1.20vh, 0.675vw);
     opacity: 0.5;
     text-align: right;
     display: inline-block;
@@ -57,7 +57,7 @@ table#mod_toplist_table {
 }
 
 table#mod_toplist_table td {
-    font-size: 1.50vh;
+    font-size: min(1.50vh, 0.84vw);
 }
 
 table#mod_toplist_table td:nth-child(2) {
