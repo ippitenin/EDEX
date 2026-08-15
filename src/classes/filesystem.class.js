@@ -123,11 +123,20 @@ class FilesystemDisplay {
             if (this._fsWatcher) {
                 this._fsWatcher.close();
             }
-            this._fsWatcher = fs.watch(dir, (eventType, filename) => {
-                if (eventType != "change") { // #758 - Don't refresh file view if only file contents have changed.
-                    this._runNextTick = true;
-                }
-            });
+
+            // A directory that disappeared, or a path that arrived mangled, must not take the whole
+            // renderer down with it — fs.watch throws synchronously and there is nothing above to
+            // catch it. Losing live refresh for one directory is the acceptable outcome.
+            try {
+                this._fsWatcher = fs.watch(dir, (eventType, filename) => {
+                    if (eventType != "change") { // #758 - Don't refresh file view if only file contents have changed.
+                        this._runNextTick = true;
+                    }
+                });
+            } catch (e) {
+                this._fsWatcher = null;
+                console.warn(`Cannot watch ${dir} for changes:`, e.message);
+            }
         };
 
         this.toggleHidedotfiles = () => {
