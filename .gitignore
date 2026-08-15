@@ -43,5 +43,8 @@ dist
 prebuild-src
 src/node_modules
 
+# Local code signing identity — machine-specific, see README
+build/signing.env
+
 # macOS
 .DS_Store
