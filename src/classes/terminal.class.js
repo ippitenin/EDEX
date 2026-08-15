@@ -339,7 +339,13 @@ class Terminal {
                             });
                             break;
                         case "Darwin":
-                            require("child_process").exec(`lsof -a -d cwd -p ${pid} | tail -1 | awk '{ for (i=9; i<=NF; i++) printf "%s ", $i }'`, (e, cwd) => {
+                            // lsof escapes every byte it considers unprintable as a literal \xNN, and what
+                            // counts as printable comes from the locale. Apps launched from Finder inherit no
+                            // LANG at all, so without one forced here a path like ~/Desktop/ЗАДАНИЕ comes back
+                            // as \xd0\x97\xd0\x90... and everything downstream — fs.watch included — chokes.
+                            require("child_process").exec(`lsof -a -d cwd -p ${pid} | tail -1 | awk '{ for (i=9; i<=NF; i++) printf "%s ", $i }'`, {
+                                env: {...process.env, LC_ALL: "en_US.UTF-8"}
+                            }, (e, cwd) => {
                                 if (e !== null) {
                                     reject(e);
                                 } else {
