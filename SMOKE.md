@@ -19,7 +19,10 @@ a terminal session, or the shell inherits that session's environment.
 
 - [ ] Boot log scrolls, then the interface appears without the glitch title screen
 - [ ] No error dialog on launch
-- [ ] Window fills the screen; keyboard rows, Enter and spacebar line up, nothing overflows
+- [ ] Window fills the work area with a title bar; close, minimise and zoom buttons are there
+- [ ] Keyboard rows, Enter and spacebar line up, nothing overflows
+- [ ] Window drags by its title bar and resizes; leaving fullscreen does not shrink it to a stamp
+- [ ] `Ctrl+Shift+M` sends the window to the next display and back — in a window and in fullscreen
 - [ ] Clock, uptime, CPU graphs, memory grid and network panel all show live values
 
 ## Terminal
