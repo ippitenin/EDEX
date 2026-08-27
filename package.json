@@ -1,7 +1,7 @@
 {
   "name": "edex-ui",
   "productName": "EDEX",
-  "version": "2.2.8",
+  "version": "2.3.0",
   "description": "A science fiction desktop running everywhere. Awesome.",
   "keywords": [
     "desktop",
@@ -14,6 +14,7 @@
   "main": "src/_boot.js",
   "scripts": {
     "start": "electron src --nointro",
+    "start-app": "node build/dev-app.js && open \"$HOME/Library/Caches/edex-build/dev/EDEX.app\" --args --nointro",
     "install-linux": "npm install && cd src && npm install && ./../node_modules/.bin/electron-rebuild -f -w node-pty && cd ..",
     "install-darwin": "npm install && cd src && npm install && cd .. && ./node_modules/.bin/electron-rebuild -f -w node-pty --module-dir src",
     "preinstall-windows": "npm install --global --production windows-build-tools && npm install --global node-gyp && setx PYTHON \"%USERPROFILE%\\.windows-build-tools\\python27\\python.exe\"",

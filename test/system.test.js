@@ -6,7 +6,8 @@ const {
     extractDirFromArgv,
     isAllowedOrigin,
     parseProcessName,
-    parseCwdOutput
+    parseCwdOutput,
+    pickNextDisplay
 } = require("../src/utils/system.js");
 
 // A stand-in filesystem: only the listed paths exist, and only as directories.
@@ -88,4 +89,28 @@ test("parseCwdOutput keeps paths with spaces intact", () => {
 
 test("parseCwdOutput handles non-ASCII paths", () => {
     assert.strictEqual(parseCwdOutput("/Users/me/Desktop/Дизайн "), "/Users/me/Desktop/Дизайн");
+});
+
+// Only the id matters to the picker; the real objects carry bounds and scale factors too.
+const displays = [{id: 1}, {id: 2}, {id: 3}];
+
+test("pickNextDisplay moves to the next display", () => {
+    assert.deepStrictEqual(pickNextDisplay(displays, 1), {id: 2});
+    assert.deepStrictEqual(pickNextDisplay(displays, 2), {id: 3});
+});
+
+test("pickNextDisplay wraps around at the end of the list", () => {
+    assert.deepStrictEqual(pickNextDisplay(displays, 3), {id: 1});
+    assert.deepStrictEqual(pickNextDisplay([{id: 7}, {id: 9}], 9), {id: 7});
+});
+
+test("pickNextDisplay has nowhere to go with a single display", () => {
+    assert.strictEqual(pickNextDisplay([{id: 1}], 1), null);
+    assert.strictEqual(pickNextDisplay([], 1), null);
+});
+
+test("pickNextDisplay gives up when the current display is gone", () => {
+    // A monitor unplugged between the lookup and the call leaves an id that no longer matches.
+    assert.strictEqual(pickNextDisplay(displays, 42), null);
+    assert.strictEqual(pickNextDisplay(undefined, 1), null);
 });

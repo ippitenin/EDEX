@@ -68,4 +68,17 @@ function parseCwdOutput(lsofOutput) {
     return lsofOutput.trim();
 }
 
-module.exports = {extractDirFromArgv, isAllowedOrigin, parseProcessName, parseCwdOutput};
+/**
+ * Picks the display that follows the current one, wrapping around at the end of the list.
+ *
+ * Returns null when there is nowhere to go — a single display, an empty list, or a current display
+ * that is not in it (which happens when a monitor is unplugged between the lookup and the call).
+ */
+function pickNextDisplay(displays, currentId) {
+    if (!Array.isArray(displays) || displays.length < 2) return null;
+    const index = displays.findIndex(display => display && display.id === currentId);
+    if (index === -1) return null;
+    return displays[(index + 1) % displays.length];
+}
+
+module.exports = {extractDirFromArgv, isAllowedOrigin, parseProcessName, parseCwdOutput, pickNextDisplay};

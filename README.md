@@ -54,6 +54,11 @@ not been attempted.
   migrated once from the old eDEX-UI folder.
 - **Layout fixed for tall, non-16:9 displays.** Key widths were expressed in `vh`, which only
   lines up on 16:9; they are now `vw`, so rows, Enter and the spacebar stay in place.
+- **The window is an ordinary window.** Upstream ran frameless and screen-sized in native
+  fullscreen, with no close, minimise or zoom buttons, and refused to be moved or resized — so a
+  second monitor was unreachable, since macOS cannot drag a window out of native fullscreen at all.
+  It now opens with a title bar, filling the work area of the chosen display. `forceFullscreen` is
+  off by default and editable in the settings editor rather than only in the JSON.
 - **Quiet by default:** no sound on keystrokes, terminal output, modals or directory
   refreshes. Enter keeps its confirmation sound, and the boot theme still plays.
 - The glitch title screen is skipped — the boot log hands straight over to the UI.
@@ -61,6 +66,12 @@ not been attempted.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
+- **`Ctrl+Shift+M` sends the window to the next display**, wrapping around at the end. It works
+  in fullscreen too: the window steps out of its Space, moves and goes back in. Beats the
+  `monitor` setting, which lists bare indices and only takes effect on a full restart.
+- **Defaults are merged into an existing config on every launch**, so a setting or shortcut added
+  in a new version reaches people who already have a `settings.json` — previously the defaults were
+  written on first run only and never revisited. Values already in the file are left alone.
 - **"Open in EDEX"** — right-click a folder in Finder, get a terminal in it. The entry sits in
   the main context menu next to Terminal's own, and opens the folder in a free tab when EDEX is
   already running. A small Swift agent embedded in the bundle publishes the service, since
@@ -80,6 +91,21 @@ npm run install-darwin   # installs deps and rebuilds node-pty against Electron'
 npm start
 ```
 
+`npm start` runs `electron src`, which launches the Electron bundle from `node_modules` and loads
+the project inside it — so macOS calls the app "Electron" in the menu bar, the Dock and the process
+list, and shows Electron's icon. That name comes from that bundle's `Info.plist`; `app.setName()`
+is documented as not affecting it.
+
+```sh
+npm run start-app        # same code, but running as EDEX
+```
+
+`start-app` builds an `EDEX.app` around the same Electron binary with our own `Info.plist` and icon,
+and symlinks its app directory to `src/` — so it is EDEX everywhere macOS shows a name, while edits
+still take effect on the next launch with no rebuild. The bundle lives in
+`~/Library/Caches/edex-build/dev/` and is rebuilt only when the Electron version changes. See
+[build/dev-app.js](build/dev-app.js).
+
 ## Checks
 
 ```sh
@@ -88,6 +114,8 @@ npm test       # unit tests on node:test — escaping, shell quoting, argv and o
 ```
 
 Anything that needs a running app is in [SMOKE.md](SMOKE.md); run through it after a build.
+[CLAUDE.md](CLAUDE.md) collects the conventions and the platform quirks worth knowing before
+changing anything here.
 
 ## Building a distributable
 

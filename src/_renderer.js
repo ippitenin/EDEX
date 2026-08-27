@@ -4,6 +4,8 @@ window.eval = global.eval = function () {
 };
 // Security helpers — implementations and their tests live in utils/sanitize.js
 const {escapeHtml, purifyCSS, quoteForShell} = require("./utils/sanitize.js");
+// Window helpers — same story, see utils/system.js
+const {pickNextDisplay} = require("./utils/system.js");
 window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
@@ -761,6 +763,14 @@ window.openSettings = async () => {
                         </select></td>
                     </tr>
                     <tr>
+                        <td>forceFullscreen</td>
+                        <td>Start in native fullscreen instead of a window filling the work area</td>
+                        <td><select id="settingsEditor-forceFullscreen">
+                            <option>${window.settings.forceFullscreen}</option>
+                            <option>${!window.settings.forceFullscreen}</option>
+                        </select></td>
+                    </tr>
+                    <tr>
                         <td>allowWindowed</td>
                         <td>Allow using F11 key to set the UI in windowed mode</td>
                         <td><select id="settingsEditor-allowWindowed">
@@ -861,7 +871,7 @@ window.writeSettingsFile = () => {
         nocursor: (document.getElementById("settingsEditor-nocursor").value === "true"),
         iface: document.getElementById("settingsEditor-iface").value,
         allowWindowed: (document.getElementById("settingsEditor-allowWindowed").value === "true"),
-        forceFullscreen: window.settings.forceFullscreen,
+        forceFullscreen: (document.getElementById("settingsEditor-forceFullscreen").value === "true"),
         keepGeometry: (document.getElementById("settingsEditor-keepGeometry").value === "true"),
         excludeThreadsFromToplist: (document.getElementById("settingsEditor-excludeThreadsFromToplist").value === "true"),
         hideDotfiles: (document.getElementById("settingsEditor-hideDotfiles").value === "true"),
@@ -890,6 +900,30 @@ window.toggleFullScreen = () => {
     fs.writeFileSync(lastWindowStateFile, JSON.stringify(window.lastWindowState, "", 4));
 };
 
+// Sends the window to the next display, wrapping around. Dragging a window this size by hand is
+// awkward, and a window in native fullscreen cannot be dragged between displays at all.
+window.moveToNextMonitor = () => {
+    const win = remote.getCurrentWindow();
+    const current = remote.screen.getDisplayMatching(win.getBounds());
+    const next = pickNextDisplay(remote.screen.getAllDisplays(), current.id);
+    if (!next) return;
+
+    // A window in native fullscreen owns a Space and cannot be moved, so it has to step out first.
+    // The catch is that "leave-full-screen" fires before macOS has actually released the window:
+    // setBounds sent at that moment gets clamped back into the display it came from, and the window
+    // never leaves. The short wait is what makes the move stick.
+    if (win.isFullScreen()) {
+        win.once("leave-full-screen", async () => {
+            await window._delay(350);
+            win.setBounds(next.workArea);
+            win.setFullScreen(true);
+        });
+        win.setFullScreen(false);
+    } else {
+        win.setBounds(next.workArea);
+    }
+};
+
 // Display available keyboard shortcuts and custom shortcuts helper
 window.openShortcutsHelp = () => {
     if (document.getElementById("settingsEditor")) return;
@@ -905,6 +939,7 @@ window.openShortcutsHelp = () => {
         "FUZZY_SEARCH": "Search for entries in the current working directory.",
         "FS_LIST_VIEW": "Toggle between list and grid view in the file browser.",
         "FS_DOTFILES": "Toggle hidden files and directories in the file browser.",
+        "NEXT_MONITOR": "Send the window to the next display, wrapping around.",
         "KB_PASSMODE": "Toggle the on-screen keyboard's \"Password Mode\", which allows you to safely<br>type sensitive information even if your screen might be recorded (disable visual input feedback).",
         "DEV_DEBUG": "Open Chromium Dev Tools, for debugging purposes.",
         "DEV_RELOAD": "Trigger front-end hot reload."
@@ -1052,6 +1087,9 @@ window.useAppShortcut = action => {
         case "KB_PASSMODE":
             window.keyboard.togglePasswordMode();
             return true;
+        case "NEXT_MONITOR":
+            window.moveToNextMonitor();
+            return true;
         case "DEV_DEBUG":
             remote.getCurrentWindow().webContents.toggleDevTools();
             return true;
@@ -1152,12 +1190,10 @@ electronWin.on("resize", () => {
     window.resizeTimeout = setTimeout(() => {
         let win = remote.getCurrentWindow();
         if (win.isFullScreen()) return false;
-        if (win.isMaximized()) {
-            win.unmaximize();
-            win.setFullScreen(true);
-            return false;
-        }
 
+        // Upstream turned every zoom into fullscreen here, because the green button could not enter
+        // fullscreen on its own back then. It can now, so zoom is left to mean zoom — otherwise
+        // option-clicking the button, the one way to ask for it, would be impossible to honour.
         let size = win.getSize();
 
         if (size[0] >= size[1]) {
@@ -1168,6 +1204,7 @@ electronWin.on("resize", () => {
     }, 100);
 });
 
-electronWin.on("leave-full-screen", () => {
-    remote.getCurrentWindow().setSize(960, 540);
-});
+// Upstream forced the window to 960x540 on leaving fullscreen, back when it was frameless and
+// screen-sized with nowhere sensible to land. With a real title bar macOS restores the pre-fullscreen
+// geometry by itself, and the forced resize only shrank the window to a stamp — including on the way
+// through moveToNextMonitor.
