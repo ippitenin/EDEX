@@ -111,53 +111,91 @@ try {
 } catch(e) {
     signale.info(`Base config dir is ${electron.app.getPath("userData")}`);
 }
-// Create default settings file
-if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(settingsFile, JSON.stringify({
-        shell: (process.platform === "win32") ? "powershell.exe" : "bash",
-        shellArgs: '',
-        cwd: electron.app.getPath("userData"),
-        keyboard: "en-US",
-        theme: "tron",
-        termFontSize: 15,
-        audio: true,
-        audioVolume: 1.0,
-        disableFeedbackAudio: false,
-        clockHours: 24,
-        pingAddr: "1.1.1.1",
-        port: 3000,
-        nointro: false,
-        nocursor: false,
-        forceFullscreen: true,
-        allowWindowed: false,
-        excludeThreadsFromToplist: true,
-        hideDotfiles: false,
-        fsListView: false,
-        experimentalGlobeFeatures: false,
-        experimentalFeatures: false
-    }, "", 4));
-    signale.info(`Default settings written to ${settingsFile}`);
+// Defaults are seeded on first run and topped up on every later one: a key or a shortcut added in a
+// new version has to reach the people who already have a config, not just fresh installs. Values
+// that are already in the file are never touched — this fills gaps, it does not reset preferences.
+const defaultSettings = {
+    shell: (process.platform === "win32") ? "powershell.exe" : "bash",
+    shellArgs: '',
+    cwd: electron.app.getPath("userData"),
+    keyboard: "en-US",
+    theme: "tron",
+    termFontSize: 15,
+    audio: true,
+    audioVolume: 1.0,
+    disableFeedbackAudio: false,
+    clockHours: 24,
+    pingAddr: "1.1.1.1",
+    port: 3000,
+    nointro: false,
+    nocursor: false,
+    forceFullscreen: false,
+    allowWindowed: false,
+    excludeThreadsFromToplist: true,
+    hideDotfiles: false,
+    fsListView: false,
+    experimentalGlobeFeatures: false,
+    experimentalFeatures: false
+};
+
+const defaultShortcuts = [
+    { type: "app", trigger: "Ctrl+Shift+C", action: "COPY", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+V", action: "PASTE", enabled: true },
+    { type: "app", trigger: "Ctrl+Tab", action: "NEXT_TAB", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+Tab", action: "PREVIOUS_TAB", enabled: true },
+    { type: "app", trigger: "Ctrl+X", action: "TAB_X", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+S", action: "SETTINGS", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+K", action: "SHORTCUTS", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+F", action: "FUZZY_SEARCH", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+L", action: "FS_LIST_VIEW", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+H", action: "FS_DOTFILES", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+M", action: "NEXT_MONITOR", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+P", action: "KB_PASSMODE", enabled: true },
+    { type: "app", trigger: "Ctrl+Shift+I", action: "DEV_DEBUG", enabled: false },
+    { type: "app", trigger: "Ctrl+Shift+F5", action: "DEV_RELOAD", enabled: true },
+    { type: "shell", trigger: "Ctrl+Shift+Alt+Space", action: "neofetch", linebreak: true, enabled: false }
+];
+
+// A config we cannot parse is left strictly alone: overwriting it would throw away settings the
+// user can still rescue by hand.
+function readConfig(file, fallback) {
+    if (!fs.existsSync(file)) return fallback;
+    try {
+        return JSON.parse(fs.readFileSync(file, "utf-8"));
+    } catch {
+        signale.warn(`Could not parse ${file}, leaving it as it is`);
+        return null;
+    }
 }
-// Create default shortcuts file
-if (!fs.existsSync(shortcutsFile)) {
-    fs.writeFileSync(shortcutsFile, JSON.stringify([
-        { type: "app", trigger: "Ctrl+Shift+C", action: "COPY", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+V", action: "PASTE", enabled: true },
-        { type: "app", trigger: "Ctrl+Tab", action: "NEXT_TAB", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+Tab", action: "PREVIOUS_TAB", enabled: true },
-        { type: "app", trigger: "Ctrl+X", action: "TAB_X", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+S", action: "SETTINGS", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+K", action: "SHORTCUTS", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+F", action: "FUZZY_SEARCH", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+L", action: "FS_LIST_VIEW", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+H", action: "FS_DOTFILES", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+P", action: "KB_PASSMODE", enabled: true },
-        { type: "app", trigger: "Ctrl+Shift+I", action: "DEV_DEBUG", enabled: false },
-        { type: "app", trigger: "Ctrl+Shift+F5", action: "DEV_RELOAD", enabled: true },
-        { type: "shell", trigger: "Ctrl+Shift+Alt+Space", action: "neofetch", linebreak: true, enabled: false }
-    ], "", 4));
-    signale.info(`Default keymap written to ${shortcutsFile}`);
+
+function seedSettings(file, defaults) {
+    const current = readConfig(file, {});
+    if (current === null || typeof current !== "object" || Array.isArray(current)) return;
+
+    const missing = Object.keys(defaults).filter(key => typeof current[key] === "undefined");
+    if (!missing.length) return;
+
+    missing.forEach(key => { current[key] = defaults[key]; });
+    fs.writeFileSync(file, JSON.stringify(current, "", 4));
+    signale.info(`Seeded ${missing.length} setting(s) in ${file}: ${missing.join(", ")}`);
 }
+
+// Shortcuts are matched on type and action rather than on the trigger, so a rebound key keeps the
+// binding the user chose instead of picking up a duplicate.
+function seedShortcuts(file, defaults) {
+    const current = readConfig(file, []);
+    if (current === null || !Array.isArray(current)) return;
+
+    const known = new Set(current.map(cut => `${cut.type}:${cut.action}`));
+    const missing = defaults.filter(cut => !known.has(`${cut.type}:${cut.action}`));
+    if (!missing.length) return;
+
+    fs.writeFileSync(file, JSON.stringify(current.concat(missing), "", 4));
+    signale.info(`Seeded ${missing.length} shortcut(s) in ${file}: ${missing.map(cut => cut.action).join(", ")}`);
+}
+
+seedSettings(settingsFile, defaultSettings);
+seedShortcuts(shortcutsFile, defaultShortcuts);
 //Create default window state file
 if(!fs.existsSync(lastWindowStateFile)) {
     fs.writeFileSync(lastWindowStateFile, JSON.stringify({
@@ -216,8 +254,10 @@ function createWindow(settings) {
     } else {
         display = electron.screen.getPrimaryDisplay();
     }
-    let {x, y, width, height} = display.bounds;
-    width++; height++;
+    // workArea, not bounds: with a title bar the window would otherwise sit under the menu bar and
+    // the Dock. Upstream added a pixel to each side to guarantee full coverage of the screen, which
+    // only made sense for a frameless window that was never meant to be moved.
+    let {x, y, width, height} = display.workArea;
     win = new BrowserWindow({
         title: "EDEX",
         x,
@@ -226,10 +266,14 @@ function createWindow(settings) {
         height,
         show: false,
         resizable: true,
-        movable: settings.allowWindowed || false,
+        movable: true,
         fullscreen: settings.forceFullscreen || false,
+        // Passing fullscreen: false explicitly is enough for Electron to mark the window as not
+        // fullscreenable, and macOS then draws the green button as a zoom "+" that merely fills the
+        // work area instead of the arrows that enter real fullscreen.
+        fullscreenable: true,
         autoHideMenuBar: true,
-        frame: settings.allowWindowed || false,
+        frame: true,
         backgroundColor: '#000000',
         webPreferences: {
             devTools: true,
@@ -253,9 +297,9 @@ function createWindow(settings) {
 
     signale.complete("Frontend window created!");
     win.show();
-    if (!settings.allowWindowed) {
-        win.setResizable(false);
-    } else if (!require(lastWindowStateFile)["useFullscreen"]) {
+    // The window is resizable and movable in every mode now, so the only thing left to restore is
+    // whether the last session ended in fullscreen.
+    if (settings.forceFullscreen && !require(lastWindowStateFile)["useFullscreen"]) {
         win.setFullScreen(false);
     }
 
