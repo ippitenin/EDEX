@@ -48,3 +48,6 @@ build/signing.env
 
 # macOS
 .DS_Store
+
+# Local signing certificate — keep the identity out of the repository
+edex-signing/
