@@ -478,7 +478,8 @@ async function initUI() {
         0: new Terminal({
             role: "client",
             parentId: "terminal0",
-            port: window.settings.port || 3000
+            // Not settings.port: the main process moves off it when another program holds it.
+            port: ipc.sendSync("tty-port")
         })
     };
     window.currentTerm = 0;
@@ -715,7 +716,7 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>port</td>
-                        <td>Local port to use for UI-shell connection</td>
+                        <td>Preferred local port for the UI-shell connection; a free one is used if it is taken</td>
                         <td><input type="number" id="settingsEditor-port" value="${window.settings.port}"></td>
                     </tr>
                     <tr>

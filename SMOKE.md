@@ -41,6 +41,16 @@ a terminal session, or the shell inherits that session's environment.
 - [ ] Switch between tabs; each keeps its own directory and history
 - [ ] Exit a shell with `exit` — the tab returns to EMPTY and focus moves to the previous tab
 
+## Busy ports
+
+A dev server on port 3000 used to crash EDEX on launch with `EADDRINUSE`.
+
+- [ ] Hold the port — `nc -l 127.0.0.1 3000` in another terminal — and launch EDEX: no error
+      dialog, the main terminal works
+- [ ] With `nc -l 127.0.0.1 3002` held as well, open a tab — it opens on another port (the tab
+      title shows `::<port>`); close it with `exit` and open it again — the slot is reusable
+- [ ] Reload the UI (`Ctrl+Shift+F5`) while the port is shifted — the terminal reconnects
+
 ## Filesystem pane
 
 - [ ] Follows the terminal: `cd` somewhere and the listing changes with it
