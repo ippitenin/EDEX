@@ -78,6 +78,7 @@ const url = require("url");
 const fs = require("fs");
 const which = require("which");
 const Terminal = require("./classes/terminal.class.js").Terminal;
+const {findFreePort} = require("./utils/net.js");
 
 ipc.on("log", (e, type, content) => {
     signale[type](content);
@@ -334,14 +335,23 @@ app.on('ready', async () => {
         LANG: cleanEnv.LANG || "ru_RU.UTF-8"
     }, settings.env);
 
-    signale.pending(`Creating new terminal process on port ${settings.port || '3000'}`);
+    // The configured port is only a preference. 3000 is also where Next.js, Create React App and
+    // most dev servers listen by default, and with one of them running the fixed bind failed with
+    // EADDRINUSE and took the whole app down on launch.
+    const preferredPort = Number(settings.port) || 3000;
+    const ttyPort = await findFreePort(preferredPort);
+    if (ttyPort !== preferredPort) {
+        signale.warn(`Port ${preferredPort} is held by another program, the terminal uses ${ttyPort} instead`);
+    }
+
+    signale.pending(`Creating new terminal process on port ${ttyPort}`);
     tty = new Terminal({
         role: "server",
         shell: settings.shell,
         params: settings.shellArgs || '',
         cwd: settings.cwd,
         env: cleanEnv,
-        port: settings.port || 3000
+        port: ttyPort
     });
     signale.success(`Terminal back-end initialized!`);
     tty.onclosed = (code, signal) => {
@@ -361,6 +371,12 @@ app.on('ready', async () => {
         signale.watch("Waiting for frontend connection...");
     };
 
+    // The renderer used to read the port from settings.json, which is no longer where the terminal
+    // necessarily is. Synchronous, because the renderer needs it before it can build the terminal.
+    ipc.on("tty-port", e => {
+        e.returnValue = tty.port;
+    });
+
     // Support for multithreaded systeminformation calls
     signale.pending("Starting multithreaded calls controller...");
     require("./_multithread.js");
@@ -376,19 +392,32 @@ app.on('ready', async () => {
         extraTtys[basePort+i] = null;
     }
 
-    ipc.on("ttyspawn", (e, arg) => {
-        let port = null;
+    ipc.on("ttyspawn", async (e, arg) => {
+        // Slots are keyed by the port they would ideally get, and reserved before the await below
+        // so two tabs opened at once cannot claim the same one.
+        let slot = null;
         Object.keys(extraTtys).forEach(key => {
-            if (extraTtys[key] === null && port === null) {
+            if (extraTtys[key] === null && slot === null) {
                 extraTtys[key] = {};
-                port = key;
+                slot = key;
             }
         });
 
-        if (port === null) {
+        if (slot === null) {
             signale.error("TTY spawn denied (Reason: exceeded max TTYs number)");
             e.sender.send("ttyspawn-reply", "ERROR: max number of ttys reached");
         } else {
+            // A dev server can hold the slot's port just as it can hold the main one.
+            let port;
+            try {
+                port = await findFreePort(Number(slot));
+            } catch (err) {
+                signale.error(`TTY slot ${slot} found no port to listen on:`, err.message);
+                extraTtys[slot] = null;
+                e.sender.send("ttyspawn-reply", "ERROR: "+err.message);
+                return;
+            }
+
             signale.pending(`Creating new TTY process on port ${port}`);
             let spawnCwd = (typeof arg === "string" && arg !== "true" && fs.existsSync(arg)) ? arg : (tty.tty._cwd || settings.cwd);
             let term = new Terminal({
@@ -404,7 +433,7 @@ app.on('ready', async () => {
                 term.ondisconnected = () => {};
                 term.wss.close();
                 signale.complete(`TTY exited at ${port}`, code, signal);
-                extraTtys[term.port] = null;
+                extraTtys[slot] = null;
                 term = null;
             };
             term.onopened = pid => {
@@ -415,11 +444,11 @@ app.on('ready', async () => {
                 term.onclosed = () => {};
                 term.close();
                 term.wss.close();
-                extraTtys[term.port] = null;
+                extraTtys[slot] = null;
                 term = null;
             };
 
-            extraTtys[port] = term;
+            extraTtys[slot] = term;
 
             // Answer only once the socket is actually accepting connections. Replying straight
             // after the constructor raced the bind: the renderer connected to a port nobody was
@@ -439,7 +468,7 @@ app.on('ready', async () => {
 
             term.wss.once("error", err => {
                 signale.error(`TTY ${port} could not open its socket:`, err.message);
-                if (extraTtys[port] === term) extraTtys[port] = null;
+                if (extraTtys[slot] === term) extraTtys[slot] = null;
                 reply("ERROR: "+err.message);
             });
         }
