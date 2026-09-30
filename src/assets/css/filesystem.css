@@ -14,8 +14,20 @@ section#filesystem > h3.title {
     padding-right: 0;
 }
 
+/* A path wider than its half of the title bar used to spill out to the right, over the
+   keyboard. As a flex row packed to the end it overflows to the left instead, into the empty
+   part of the bar; FilesystemDisplay.fitTitleDir shortens whatever would reach the label. */
+section#filesystem > h3.title > p#fs_disp_title_dir {
+    display: inline-flex;
+    justify-content: flex-end;
+    /* The note and the path can come from different fonts, with different ascents. */
+    align-items: baseline;
+}
+
 section#filesystem.hideDotfiles > h3.title > p#fs_disp_title_dir::before {
     content: "dotfiles hidden - ";
+    /* A flex item drops the space at its end; this one is what separates the note from the path. */
+    white-space: pre;
 }
 
 h2#fs_disp_error {

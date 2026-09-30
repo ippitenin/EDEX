@@ -59,6 +59,51 @@ class FilesystemDisplay {
         this._runNextTick = false;
         this._reading = false;
 
+        // The title bar shows the working directory, right-aligned. Its box is half the bar,
+        // but the text may run on to the left through the empty part — up to the label — and
+        // only a path too long even for that is shortened, from the middle. Left alone it
+        // overflowed to the right instead, straight across the keyboard.
+        this._titleDir = "";
+        this._titleRuler = document.createElement("span");
+        this._titleRuler.setAttribute("style", "position:absolute;top:-999vh;left:0;visibility:hidden;white-space:pre;");
+        document.body.appendChild(this._titleRuler);
+        this.fitTitleDir = () => {
+            let dirEl = document.getElementById("fs_disp_title_dir");
+            let labelEl = document.querySelector("section#filesystem > h3.title > p:first-of-type");
+            if (!dirEl || !labelEl) return;
+
+            let box = dirEl.getBoundingClientRect();
+            // Not laid out yet, so nothing to measure against.
+            if (box.width === 0) {
+                dirEl.innerText = this._titleDir;
+                return;
+            }
+
+            // Measured in the real font rather than estimated: the width of a path depends on
+            // the theme, on the window and on whether the name is Latin or Cyrillic.
+            let style = window.getComputedStyle(dirEl);
+            this._titleRuler.style.font = style.font;
+            this._titleRuler.style.letterSpacing = style.letterSpacing;
+            let widthOf = text => {
+                this._titleRuler.textContent = text;
+                return this._titleRuler.getBoundingClientRect().width;
+            };
+
+            let labelEnd = labelEl.getBoundingClientRect().left + widthOf(labelEl.innerText);
+            let gap = 2 * parseFloat(style.fontSize);
+            // The "dotfiles hidden" note is a ::before on the same element and takes its share.
+            let note = container.classList.contains("hideDotfiles") ? widthOf("dotfiles hidden - ") : 0;
+            let room = box.right - labelEnd - gap - note;
+
+            dirEl.innerText = window._shortenPath(this._titleDir, text => widthOf(text) <= room);
+        };
+        this.setTitleDir = text => {
+            this._titleDir = text;
+            this.fitTitleDir();
+        };
+        // Sizes are in vh and vw, so the room for the path changes with the window.
+        window.addEventListener("resize", this.fitTitleDir);
+
         this._timer = setInterval(() => {
             if (this._runNextTick === true) {
                 this._runNextTick = false;
@@ -147,6 +192,7 @@ class FilesystemDisplay {
                 container.classList.add("hideDotfiles");
                 window.settings.hideDotfiles = true;
             }
+            this.fitTitleDir();
         };
 
         this.toggleListview = () => {
@@ -163,12 +209,13 @@ class FilesystemDisplay {
             if (this.failed === true || this._reading) return false;
             this._reading = true;
 
-            document.getElementById("fs_disp_title_dir").innerText = this.dirpath;
             this.filesContainer.setAttribute("class", "");
             this.filesContainer.innerHTML = "";
             if (this._noTracking) {
                 document.querySelector("section#filesystem > h3.title > p:first-of-type").innerText = "FILESYSTEM - TRACKING FAILED, RUNNING DETACHED FROM TTY";
             }
+            // After the label: a longer label leaves less room for the path.
+            this.setTitleDir(this.dirpath);
 
             if (process.platform === "win32" && dir.endsWith(":")) dir = dir+"\\";
             let tcwd = dir;
@@ -303,15 +350,14 @@ class FilesystemDisplay {
             if (this.failed === true) return false;
 
             if (isDiskView) {
-                document.getElementById("fs_disp_title_dir").innerText = "Showing available block devices";
                 this.filesContainer.setAttribute("class", "disks");
             } else {
-                document.getElementById("fs_disp_title_dir").innerText = this.dirpath;
                 this.filesContainer.setAttribute("class", "");
             }
             if (this._noTracking) {
                 document.querySelector("section#filesystem > h3.title > p:first-of-type").innerText = "FILESYSTEM - TRACKING FAILED, RUNNING DETACHED FROM TTY";
             }
+            this.setTitleDir(isDiskView ? "Showing available block devices" : this.dirpath);
 
             let filesDOM = ``;
             blockList.forEach((e, blockIndex) => {

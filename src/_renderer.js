@@ -8,10 +8,13 @@ const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("./ut
 const {pickNextDisplay} = require("./utils/system.js");
 // Which physical key each slot of the on-screen keyboard stands for, see utils/keyboard.js
 const {codeForKeySlot} = require("./utils/keyboard.js");
+// Fits the working directory into the filesystem panel's title bar, see utils/paths.js
+const {shortenPath} = require("./utils/paths.js");
 window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
 window._codeForKeySlot = codeForKeySlot;
+window._shortenPath = shortenPath;
 window._encodePathURI = uri => {
     return encodeURI(uri).replace(/#/g, "%23");
 };
