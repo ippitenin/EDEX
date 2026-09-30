@@ -23,6 +23,10 @@ a terminal session, or the shell inherits that session's environment.
       no blink, no step sideways or upwards when the greeting and the keyboard appear
 - [ ] The keyboard fades in where it stands, row after row; the keys do not travel across the
       screen and nothing snaps into place at the end
+- [ ] The filesystem panel fades in together with the greeting and the keyboard, already listing
+      the starting directory; the side columns follow afterwards, and the listing is not redrawn
+      when the terminal comes up
+- [ ] Same on a UI reload (`Ctrl+Shift+F5`) from another directory — the panel opens on that one
 - [ ] Window fills the work area with a title bar; close, minimise and zoom buttons are there
 - [ ] Keyboard rows, Enter and spacebar line up, nothing overflows
 - [ ] Window drags by its title bar and resizes; leaving fullscreen does not shrink it to a stamp

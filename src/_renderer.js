@@ -439,6 +439,16 @@ async function initUI() {
 
     greeter.setAttribute("style", "opacity: 1;");
 
+    // The filesystem panel comes up with the greeting and the keyboard rather than two seconds
+    // later with the side columns. There is no terminal to follow yet, so it is pointed at the
+    // directory the shell starts in, and it stays deaf to clicks until there is a terminal for
+    // them to type into.
+    window.fsDisp = new FilesystemDisplay({
+        parentId: "filesystem"
+    });
+    window.fsDisp.showDir(ipc.sendSync("tty-cwd"));
+    document.getElementById("filesystem").setAttribute("style", "opacity: 1; pointer-events: none;");
+
     document.getElementById("keyboard").setAttribute("style", "");
     document.getElementById("keyboard").setAttribute("class", "animation_state_1");
     window.audioManager.keyboard.play();
@@ -565,9 +575,8 @@ async function initUI() {
 
     await _delay(100);
 
-    window.fsDisp = new FilesystemDisplay({
-        parentId: "filesystem"
-    });
+    // The panel has been on screen since the greeting; now it has a terminal to follow.
+    window.fsDisp.followTab();
 
     await _delay(200);
 

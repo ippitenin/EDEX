@@ -143,6 +143,10 @@ class FilesystemDisplay {
 
             let num = window.currentTerm;
 
+            // At startup the panel exists before the terminal does; initUI calls back in once
+            // there is a tab to follow.
+            if (!window.term || !window.term[num]) return false;
+
             window.term[num].oncwdchange = cwd => {
                 // See #501
                 if (this._noTracking) return false;
@@ -163,6 +167,15 @@ class FilesystemDisplay {
             };
         };
         this.followTab();
+
+        // Shows a directory without waiting for a terminal to report it — the startup case,
+        // where the panel appears together with the keyboard. Recording it as the tracked path
+        // is what stops the terminal's first report of the same directory from redrawing it.
+        this.showDir = dir => {
+            this.cwd_path = dir;
+            this.readFS(dir);
+            this.watchFS(dir);
+        };
 
         this.watchFS = dir => {
             if (this._fsWatcher) {
@@ -594,13 +607,10 @@ class FilesystemDisplay {
             }
         };
 
-        // Automatically start indexing supposed beginning CWD
-        // See #365
-        // ...except if we're hot-reloading, in which case this can mess up the rendering
-        // See #392
-        if (window.performance.navigation.type === 0) {
-            this.readFS(window.term[window.currentTerm].cwd || window.settings.cwd);
-        }
+        // The first directory is not read from here any more. The constructor used to guess it
+        // from the terminal (#365) — except on a hot reload, where the guess and the terminal's
+        // own report raced each other (#392). initUI now hands over the shell's real directory
+        // through showDir, before a terminal exists, and that covers both cases.
 
         this.openFile = (name, path, type) => { //Might add text formatting at some point, not now though - Surge
             let block;
