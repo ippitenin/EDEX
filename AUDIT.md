@@ -1,15 +1,19 @@
 # Code audit — 2026-08-15
 
 A full pass over the fork's own code: `src/_boot.js`, `src/_renderer.js`, `src/ui.html` and the
-17 classes in `src/classes/`. The vendored `src/assets/vendor/encom-globe.js` was reviewed only
+18 classes then in `src/classes/`. The vendored `src/assets/vendor/encom-globe.js` was reviewed only
 at its call sites.
 
 Everything below is inherited from upstream eDEX-UI v2.2.8 unless noted. Findings are ordered by
 severity; each names the file, the data source, and how it goes wrong.
 
 **Status: all findings below are fixed**, apart from the two recorded as accepted (16) and
-deferred (out of scope). See `git log` for the commit that addresses each one, and `SMOKE.md`
-for what to re-check after a build.
+deferred (out of scope). Two of them — 15 and 18 — were marked fixed here in August but were not;
+they were closed in the [follow-up](#follow-up--2026-09-30), which also lists what that pass found
+and what is still open. See `git log` for the commit that addresses each one, and `SMOKE.md` for
+what to re-check after a build.
+
+Line numbers refer to the code as it was at `8f9b2cc`, when this was written.
 
 A second set of defects surfaced once ESLint was in place — they are listed under "Found while
 fixing" at the end.
@@ -202,3 +206,82 @@ subdirectories — shipped unminified.
 Context isolation with a preload bridge. It is the one change that would downgrade every finding
 above from "system compromise" to "broken pixels", and it means rewriting how the window talks to
 the main process. Deliberately deferred — the fixes here stand on their own.
+
+---
+
+## Follow-up — 2026-09-30
+
+A second pass, made while refactoring the code that had grown since August. Line numbers here
+refer to the code before the `refactor` branch; the commits on that branch say where each fix
+landed.
+
+### Corrections to the list above
+
+- **15 was never fixed.** The theme name still went into `require()` unconstrained. Theme and
+  keyboard layout names now go through `resolveNamedFile`, which refuses anything with a path
+  separator or a dot entry.
+- **18 was fixed only halfway.** The call gained its `this.`, but it sat inside plain `function`
+  callbacks, where `this` is undefined in a class body, so a queued page still threw. The callbacks
+  are arrow functions now.
+- **"File names in the filesystem pane … escaped at construction"** held for the listing and
+  nowhere else, and storing the name pre-escaped caused a finding of its own (21).
+- **"The terminal websocket … verifies Origin"** is true, but its one-client limit compared
+  `clients.length` on a `Set` and never applied (24).
+
+### Found and fixed
+
+21. **A folder's name ran as a command when it was clicked** — `src/classes/filesystem.class.js`.
+    The panel typed `cd "<name>"` into the shell and pressed Enter; double quotes leave `$(…)` and
+    backticks live. Shift-click and the disks view did the same with paths. Everything now goes
+    through `quoteForShell`, and the names are stored raw so `R&D` is no longer sent as `R&amp;D`.
+22. **Strings from the disk inside `onclick` attributes** — theme and layout names, mount points,
+    and the path for "Save to Disk". HTML escaping is undone before the handler runs, so a quote in
+    a name broke out. Handlers now carry only an index, and `Modal` accepts functions as actions.
+23. **Unescaped markup in the filesystem panel and the editors** — volume labels and mount points
+    in the disks view, the contents of a text file in the editor (`</textarea>` closed it), every
+    value of `settings.json` in the settings editor, triggers and commands in the shortcuts help,
+    and layout row names used as element ids.
+24. **The terminal socket accepted more than one client** — `src/classes/terminal.class.js`. The
+    limit is meant to back up the Origin check, which lets a client without an Origin through.
+25. **Crashes and dead ends in the main process** — quitting before the main terminal existed, a
+    reserved tab slot without `close()`, a rejected `ready` handler leaving the app with no window
+    and no dialog, a tab whose socket failed leaving its shell running, a closed tab's timer and
+    IPC listener outliving it, any value in `shellArgs` stopping the terminal from starting
+    (node-pty refuses a string), and a non-numeric port collapsing the tab slots.
+26. **Crashes in the renderer** — the editor opening on the text `undefined` after a read error
+    (and Save writing it over the file), the filesystem panel dying for good on an unreadable
+    directory or an entry deleted mid-read, the fuzzy finder with no results or opened twice,
+    a shortcut with a modifier other than Ctrl, Alt or Shift, and `env` being saved as
+    `"[object Object]"`.
+
+### Still open
+
+Found in the same pass and left for their own changes, as none of them is a security issue or a
+crash:
+
+- **On-screen keyboard:** CapsLock always ends up off after a physical CapsLock press
+  (`keyboard.class.js`, two `if`s in a row); the cedilla dead key never releases; Ctrl+T sends ^R
+  (`CTRLSEQ[9]` repeats `[8]`, as upstream shipped it); acute on `E` gives `E`. The tables in
+  `src/utils/keyboard.js` reproduce these on purpose — the test fixture records the old behaviour.
+- **Panels that stop updating:** the CPU graphs freeze for good if systeminformation once answers
+  without per-core data (`cpuinfo.class.js`, `updatingCPUload` stays set), and the memory panel
+  does the same on a throw inside its update.
+- **Listener leaks:** the media player adds three document listeners per file opened, and
+  `remakeKeyboard` keeps adding touch and blur listeners to the reused container.
+- **Terminal client:** the F11 handler is bound to the first tab's textarea whichever tab is
+  created; `cursorBlink || true` is always true.
+- **Settings editor:** a volume of 0 shows and saves as 1.0.
+- **Disk usage:** the fallback percentage is computed as size / used instead of used / size.
+- **Tabs:** `ttyspawn-reply` carries no request id, so two tabs spawned at the same moment could
+  both take the first answer.
+- **Netstat:** `new require("https").Agent(…)` only works because Node lets `Agent` be called
+  without `new`.
+- **System panel:** between 23:59:00 and midnight the date updater reschedules itself with a zero
+  delay, spinning for up to a minute.
+- **Dev bundle:** `build/dev-app.js` only rebuilds when the Electron version changes, so its
+  version string and its link to `src/` go stale after a version bump or a move of the checkout.
+- **Shortcuts:** deleting the example `neofetch` shortcut brings it back on the next launch, since
+  defaults are matched by type and action.
+- **Dependencies:** `npm audit` reports high severity advisories against Electron 43.4.0 and its
+  bundled `undici`.
+

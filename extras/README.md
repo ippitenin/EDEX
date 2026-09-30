@@ -37,8 +37,12 @@ The helper is compiled and embedded automatically by `build/afterPack.js` on eve
 To build it standalone:
 
 ```sh
-swiftc -O -framework Cocoa -o "EDEX Service" extras/service-helper/main.swift
+swiftc -O -target arm64-apple-macos11.0 -framework Cocoa -o "EDEX Service" extras/service-helper/main.swift
 ```
+
+In a build the target comes from the architecture electron-builder is packaging — `x86_64-…` for
+an x64 app — through `build/lib/arch.js`, and `11.0` matches `LSMinimumSystemVersion` in the
+helper's `Info.plist`.
 
 Then assemble a bundle with `Contents/MacOS/EDEX Service`, `Contents/Info.plist` (from
 `extras/service-helper/`) and `Contents/Resources/icon.icns`.
@@ -60,6 +64,11 @@ key per locale, with `default` as the fallback:
 
 Add a key for any locale you want — `de`, `fr`, `ja`. This is the same mechanism Terminal uses
 for its own service.
+
+The helper looks for the app by its bundle id, `com.edex.ui`, and falls back to
+`/Applications/EDEX.app`. Running from source does not count: `npm start` is Electron's own bundle
+and `npm run start-app` uses `com.edex.ui.dev` on purpose, so the service always opens the
+installed copy.
 
 ## Troubleshooting
 

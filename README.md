@@ -16,8 +16,9 @@ sound on every keystroke.
 
 ## What is different from upstream
 
-All changes are dated **2026-08-14** and **2026-08-15**, and are described per-commit in
-`git log`. The security review behind the second batch is written up in [AUDIT.md](AUDIT.md).
+The fork's changes began on **2026-08-14** and are described per-commit in `git log`; the
+[version history](#version-history) below says what each release brought. The security review
+behind them, and its follow-up, is written up in [AUDIT.md](AUDIT.md).
 
 ### Runtime and packaging
 - **Electron 12 → 43** (Chromium 89 → 150), electron-builder 22 → 26, `electron-rebuild` →
@@ -32,14 +33,19 @@ All changes are dated **2026-08-14** and **2026-08-15**, and are described per-c
   the local renderer loaded from `file://`. Upstream listened on every interface and accepted
   whichever client connected first — the long-standing eDEX-UI exposure. Without the Origin
   check, a web page open in a browser could connect to the local port and drive the shell.
-- **Untrusted values are escaped before they reach the DOM** — process names, volume labels,
-  keyboard layout files, error text. Upstream interpolated them raw, which with node
-  integration enabled meant a file named `<img src=x onerror=…>` executed code the moment it
-  was displayed. See [AUDIT.md](AUDIT.md).
-- **Paths typed into the shell are quoted properly**, so a file named `'; rm -rf ~; '` stays a
-  file name.
-- **pdf.js updated** from 2.16 to 4.10, with `eval` disabled in the viewer
-  (CVE-2024-4367). `npm audit` in `src/` reports no vulnerabilities.
+- **Untrusted values are escaped before they reach the DOM** — process names, file names, volume
+  labels, the contents of a file opened in the editor, keyboard layout files, values from
+  `settings.json`, error text. Upstream interpolated them raw, which with node integration
+  enabled meant a file named `<img src=x onerror=…>` executed code the moment it was displayed.
+  See [AUDIT.md](AUDIT.md).
+- **Paths typed into the shell are quoted properly** — from the fuzzy finder and from clicks in
+  the filesystem panel alike — so a folder named `$(curl …|sh)` or `'; rm -rf ~; '` stays a name.
+- **Theme and keyboard layout names stay inside their folders**; a crafted name used to load a
+  file from anywhere.
+- **pdf.js updated** from 2.16 to 4.10, with `eval` disabled in the viewer (CVE-2024-4367).
+- **Dependencies are not advisory-free right now.** As of 2026-09-30 `npm audit` reports high
+  severity advisories against Electron 43.4.0 itself and the `undici` it bundles; moving to a
+  patched Electron is a separate update, not part of this release.
 - **The update checker is gone.** It fetched releases from the upstream repository on every
   launch and dropped the response into modal markup, `onclick` handler included.
 
@@ -60,7 +66,7 @@ not been attempted.
   It now opens with a title bar, filling the work area of the chosen display. `forceFullscreen` is
   off by default and editable in the settings editor rather than only in the JSON.
 - **Quiet by default:** no sound on keystrokes, terminal output, modals or directory
-  refreshes. Enter keeps its confirmation sound, and the boot theme still plays.
+  refreshes. Enter keeps its confirmation sound, and the start-up sequence keeps its own.
 - The glitch title screen is skipped — the boot log hands straight over to the UI.
 - **The startup animation lands where it started.** The terminal frame used to unfold, blink and
   jump to a different spot, and the keyboard spread across the whole screen before snapping into
@@ -92,9 +98,30 @@ not been attempted.
   Terminal.app does it. That is also what lets Claude Code turn a dropped image into an
   attachment.
 
+## Version history
+
+- **2.4.1** (2026-09-30) — a tidy-up after the summer's branches, and the holes it turned up.
+  Clicking a folder in the filesystem panel no longer runs anything in its name; file contents,
+  volume labels, settings values and theme names are escaped or confined; the one-client limit on
+  the terminal socket works. Quitting during start-up, a tab whose socket fails, any value in
+  `shellArgs`, unreadable files and directories, empty fuzzy searches and fast PDF paging no longer
+  crash or leave shells behind, and a custom `env` survives the settings editor. Underneath, the
+  logic moved into tested helpers (121 tests), dead code and sounds went, and the Finder helper is
+  compiled for the architecture being packaged.
+- **2.4.0** (2026-09-30) — the on-screen keyboard follows any input language, files dropped on the
+  window are typed in as paths, Russian names get a matching font, a long path stays inside the
+  filesystem panel, the startup animation lands where it started, and the filesystem panel
+  arrives with the keyboard and lists everything. A dev server on port 3000 no longer stops the
+  app from starting (2026-09-11).
+- **2.3.0** (2026-08-27) — an ordinary window with a title bar, `Ctrl+Shift+M` onto the next
+  display, and `npm run start-app` to run from source as EDEX.
+- **2.2.8 + fork** (2026-08-14 to 2026-08-16) — Electron 43 on native arm64, the security audit and
+  its fixes, "Open in EDEX" in Finder, signing that keeps permissions, and non-ASCII directory names.
+
 ## Requirements
 
-macOS on Apple Silicon, Xcode command line tools, Node.js and npm.
+macOS 12 or later on Apple Silicon — Electron 43's floor — plus the Xcode command line tools,
+Node.js and npm to build.
 
 Other platforms are inherited from upstream and left untouched — the fork is only tested on
 macOS arm64.
@@ -106,8 +133,8 @@ npm run install-darwin   # installs deps and rebuilds node-pty against Electron'
 npm start
 ```
 
-`npm start` runs `electron src`, which launches the Electron bundle from `node_modules` and loads
-the project inside it — so macOS calls the app "Electron" in the menu bar, the Dock and the process
+`npm start` runs `electron src --nointro` — the boot log is skipped — which launches the Electron
+bundle from `node_modules` and loads the project inside it — so macOS calls the app "Electron" in the menu bar, the Dock and the process
 list, and shows Electron's icon. That name comes from that bundle's `Info.plist`; `app.setName()`
 is documented as not affecting it.
 
@@ -121,12 +148,21 @@ still take effect on the next launch with no rebuild. The bundle lives in
 `~/Library/Caches/edex-build/dev/` and is rebuilt only when the Electron version changes. See
 [build/dev-app.js](build/dev-app.js).
 
+Both share the config folder and the single-instance lock with an installed EDEX: with
+`/Applications/EDEX.app` running, they hand their arguments to it and exit. The Finder service only
+ever talks to the installed app.
+
 ## Checks
 
 ```sh
-npm run lint   # ESLint, tuned for real defects rather than style
-npm test       # unit tests on node:test — escaping, shell quoting, argv and origin checks
+npm run lint   # ESLint, tuned for real defects rather than style; expected to stay at zero warnings
+npm test       # unit tests on node:test
 ```
+
+The tests cover everything in `src/utils/` and `build/lib/`: escaping and shell quoting, config
+seeding and the shell environment, argv, origin and port handling, the keyboard's slot map, dead
+keys and control sequences (held to output recorded from the code they replaced), path fitting,
+number formatting, and the names the build and the Finder helper must agree on.
 
 Anything that needs a running app is in [SMOKE.md](SMOKE.md); run through it after a build.
 [CLAUDE.md](CLAUDE.md) collects the conventions and the platform quirks worth knowing before
