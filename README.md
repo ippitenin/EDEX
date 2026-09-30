@@ -63,6 +63,11 @@ not been attempted.
   refreshes. Enter keeps its confirmation sound, and the boot theme still plays.
 - The glitch title screen is skipped — the boot log hands straight over to the UI.
 - `LANG` defaults to `ru_RU.UTF-8` when unset; without it Cyrillic input came out as digits.
+- **Cyrillic in the interface font.** United Sans has none, so Russian file names were drawn in
+  the system fallback — wider and heavier than the Latin next to them. Play's Cyrillic is now
+  registered under the theme font's own name and fills the gap in every theme.
+- **The on-screen keyboard lights up by physical key.** It used to match the character typed, so
+  under a Russian input source the letters stayed dark.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
@@ -76,6 +81,9 @@ not been attempted.
   the main context menu next to Terminal's own, and opens the folder in a free tab when EDEX is
   already running. A small Swift agent embedded in the bundle publishes the service, since
   Electron cannot register one itself. See [extras/](extras/).
+- **Files dropped on the window are typed into the active tab as paths**, escaped the way
+  Terminal.app does it. That is also what lets Claude Code turn a dropped image into an
+  attachment.
 
 ## Requirements
 

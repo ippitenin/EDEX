@@ -78,6 +78,14 @@ ipc.once("getKbOverride", (e, layout) => {
 });
 ipc.send("getKbOverride");
 
+// Cyrillic for the UI font: Play (SIL OFL, see assets/fonts/play_OFL.txt), split the way Google
+// Fonts ships it. The first file covers Russian, Ukrainian, Belarusian, Bulgarian and Serbian;
+// the second the rest of the script.
+const cyrillicCompanion = {
+    "play_cyrillic.woff2": "U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116",
+    "play_cyrillic_ext.woff2": "U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F"
+};
+
 // Load UI theme
 window._loadTheme = theme => {
 
@@ -89,6 +97,25 @@ window._loadTheme = theme => {
     let mainFont = new FontFace(theme.cssvars.font_main, `url("${path.join(fontsDir, theme.cssvars.font_main.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
     let lightFont = new FontFace(theme.cssvars.font_main_light, `url("${path.join(fontsDir, theme.cssvars.font_main_light.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
     let termFont = new FontFace(theme.terminal.fontFamily, `url("${path.join(fontsDir, theme.terminal.fontFamily.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
+
+    // United Sans, which every bundled theme uses, has no Cyrillic. Russian file names fell
+    // through to the system sans-serif — Helvetica, wider and heavier, visibly another font.
+    // Play's Cyrillic is registered under the theme's own family names instead, so everything
+    // already styled with --font_main or --font_main_light picks it up without a CSS change;
+    // the unicode-range keeps it away from Latin text.
+    //
+    // These go in before the theme's faces on purpose. When faces of one family overlap,
+    // Chromium asks the one added last first — so a theme whose font has Cyrillic of its own
+    // keeps it, and Play only fills what is missing.
+    [theme.cssvars.font_main, theme.cssvars.font_main_light].forEach(family => {
+        Object.keys(cyrillicCompanion).forEach(file => {
+            let face = new FontFace(family, `url("${path.join(fontsDir, file).replace(/\\/g, '/')}")`, {unicodeRange: cyrillicCompanion[file]});
+            document.fonts.add(face);
+            // Loaded up front rather than on first use, or the first Russian name to appear
+            // would flash in the system font. A missing file only means that fallback stays.
+            face.load().catch(() => {});
+        });
+    });
 
     document.fonts.add(mainFont);
     document.fonts.load("12px "+theme.cssvars.font_main);

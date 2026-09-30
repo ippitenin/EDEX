@@ -79,6 +79,8 @@ A dev server on port 3000 used to crash EDEX on launch with `EADDRINUSE`.
 - [ ] Disk usage bar shows a mount name and a percentage
 - [ ] Open a folder holding a file named `<img src=x onerror=alert(1)>` — the name is shown as
       text, no dialog, nothing executes
+- [ ] Open a folder with Russian and English names side by side — both are drawn with strokes of
+      the same weight, and a name mixing the two (`Доступы.md`) reads as one font
 - [ ] Click an image, a video and a PDF — each opens in its viewer and plays or renders
 - [ ] Close a media modal; playback stops
 
