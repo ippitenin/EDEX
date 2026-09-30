@@ -39,3 +39,8 @@ This project bundles and depends on third-party open-source software, each under
 license — among them xterm.js, systeminformation, SmoothieCharts, pdf.js, node-pty and the
 ENCOM Globe by Rob "Arscan" Scanlon. Their notices and terms travel with their respective
 packages.
+
+The Cyrillic glyphs of the interface font come from **Play** by Jonas Hecksher (Playtype,
+e-Types AS), copyright © 2011, used under the SIL Open Font License 1.1. The two subset files in
+`src/assets/fonts/` are unmodified copies of the ones Google Fonts distributes, taken from the
+Fontsource package; the license text sits beside them in `play_OFL.txt`.

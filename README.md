@@ -63,6 +63,9 @@ not been attempted.
   refreshes. Enter keeps its confirmation sound, and the boot theme still plays.
 - The glitch title screen is skipped — the boot log hands straight over to the UI.
 - `LANG` defaults to `ru_RU.UTF-8` when unset; without it Cyrillic input came out as digits.
+- **Cyrillic in the interface font.** United Sans has none, so Russian file names were drawn in
+  the system fallback — wider and heavier than the Latin next to them. Play's Cyrillic is now
+  registered under the theme font's own name and fills the gap in every theme.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
