@@ -42,12 +42,20 @@ function mergeMissingShortcuts(current, defaults) {
     return {shortcuts: current.concat(added), added};
 }
 
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * Builds the environment the shell starts with, from the one a login shell would have.
  *
  * LANG falls back to ru_RU.UTF-8 because an app launched from Finder inherits no locale at all, and
  * without one zsh and lsof mangle every non-ASCII path. The overrides from settings.env come last,
  * so they can replace anything, TERM and LANG included.
+ *
+ * Overrides that are not an object are ignored. The settings editor used to save env as the string
+ * "[object Object]", which Object.assign spread into variables named 0, 1, 2… — configs carrying
+ * that string are still out there.
  */
 function buildShellEnv(loginEnv, {version, overrides} = {}) {
     return Object.assign({}, loginEnv, {
@@ -56,7 +64,36 @@ function buildShellEnv(loginEnv, {version, overrides} = {}) {
         TERM_PROGRAM: "EDEX",
         TERM_PROGRAM_VERSION: version,
         LANG: loginEnv.LANG || "ru_RU.UTF-8"
-    }, overrides);
+    }, isPlainObject(overrides) ? overrides : {});
+}
+
+/**
+ * The text the settings editor shows for settings.env: JSON for an object, nothing when unset. A
+ * value that is already broken is shown as it is, so it can be seen and fixed.
+ */
+function formatEnvSetting(env) {
+    if (typeof env === "undefined" || env === null) return "";
+    if (typeof env === "string") return env;
+    return JSON.stringify(env);
+}
+
+/**
+ * Reads settings.env back from the editor. Returns {env} — undefined when the field is empty, so the
+ * key leaves the file — or {error} when the text is not a JSON object, in which case nothing should
+ * be written.
+ */
+function parseEnvSetting(text) {
+    const trimmed = (typeof text === "string") ? text.trim() : "";
+    if (trimmed === "") return {env: undefined};
+
+    let value;
+    try {
+        value = JSON.parse(trimmed);
+    } catch (err) {
+        return {error: `env is not valid JSON: ${err.message}`};
+    }
+    if (!isPlainObject(value)) return {error: 'env must be a JSON object, such as {"EDITOR": "vim"}'};
+    return {env: value};
 }
 
 /**
@@ -80,4 +117,13 @@ function parseShellArgs(value) {
     return value.split(/\s+/).filter(Boolean);
 }
 
-module.exports = {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort, parseShellArgs};
+module.exports = {
+    mergeMissingSettings,
+    mergeMissingShortcuts,
+    isPlainObject,
+    buildShellEnv,
+    formatEnvSetting,
+    parseEnvSetting,
+    preferredPort,
+    parseShellArgs
+};

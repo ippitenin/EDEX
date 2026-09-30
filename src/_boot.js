@@ -9,7 +9,7 @@ const remoteMain = require("@electron/remote/main");
 const Terminal = require("./classes/terminal.class.js").Terminal;
 const {findFreePort} = require("./utils/net.js");
 const {extractDirFromArgv, pickStartDisplay, resolveSpawnCwd, firstFreeSlot} = require("./utils/system.js");
-const {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort, parseShellArgs} = require("./utils/config.js");
+const {mergeMissingSettings, mergeMissingShortcuts, isPlainObject, buildShellEnv, preferredPort, parseShellArgs} = require("./utils/config.js");
 
 // Declared ahead of everything that can throw: the crash handler below reads them, and a let still
 // in its temporal dead zone would turn the crash report itself into a ReferenceError.
@@ -469,6 +469,9 @@ async function onReady() {
 
     // An app launched from Finder gets launchd's bare environment, not the one a login shell builds
     // from .zprofile and friends — no PATH additions, no locale. shell-env asks the shell itself.
+    if (typeof settings.env !== "undefined" && !isPlainObject(settings.env)) {
+        signale.warn("settings.env is not an object and is ignored; set it again in the settings editor");
+    }
     const env = buildShellEnv(await require("shell-env")(settings.shell), {
         version: app.getVersion(),
         overrides: settings.env

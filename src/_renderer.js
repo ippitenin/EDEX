@@ -8,6 +8,8 @@ const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("./ut
 const {pickNextDisplay} = require("./utils/system.js");
 // Which physical key each slot of the on-screen keyboard stands for, see utils/keyboard.js
 const {codeForKeySlot} = require("./utils/keyboard.js");
+// Shows settings.env as JSON in the settings editor and reads it back, see utils/config.js
+const {formatEnvSetting, parseEnvSetting} = require("./utils/config.js");
 // Fits the working directory into the filesystem panel's title bar and keeps theme and layout
 // names inside their folders, see utils/paths.js
 const {shortenPath, resolveNamedFile} = require("./utils/paths.js");
@@ -756,8 +758,8 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>env</td>
-                        <td>Custom shell environment override</td>
-                        <td><input type="text" id="settingsEditor-env" value="${escapeHtml(window.settings.env)}"></td>
+                        <td>Custom shell environment override, as a JSON object</td>
+                        <td><input type="text" id="settingsEditor-env" value="${escapeHtml(formatEnvSetting(window.settings.env))}"></td>
                     </tr>
                     <tr>
                         <td>username</td>
@@ -938,11 +940,19 @@ window.openSettings = async () => {
 };
 
 window.writeSettingsFile = () => {
+    // env is an object in the file and JSON in the editor. It used to be shown as "[object Object]"
+    // and saved as that string, which then reached the shell as a pile of numbered variables.
+    const env = parseEnvSetting(document.getElementById("settingsEditor-env").value);
+    if (env.error) {
+        document.getElementById("settingsEditorStatus").innerText = `Not saved: ${env.error}`;
+        return;
+    }
+
     window.settings = {
         shell: document.getElementById("settingsEditor-shell").value,
         shellArgs: document.getElementById("settingsEditor-shellArgs").value,
         cwd: document.getElementById("settingsEditor-cwd").value,
-        env: document.getElementById("settingsEditor-env").value,
+        env: env.env,
         username: document.getElementById("settingsEditor-username").value,
         keyboard: document.getElementById("settingsEditor-keyboard").value,
         theme: document.getElementById("settingsEditor-theme").value,

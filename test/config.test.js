@@ -6,6 +6,8 @@ const {
     mergeMissingSettings,
     mergeMissingShortcuts,
     buildShellEnv,
+    formatEnvSetting,
+    parseEnvSetting,
     preferredPort,
     parseShellArgs
 } = require("../src/utils/config.js");
@@ -175,4 +177,41 @@ test("no shell arguments means an empty list, so the terminal adds --login itsel
 
 test("a list of shell arguments written into settings.json by hand passes through", () => {
     assert.deepStrictEqual(parseShellArgs(["-c", "echo hi"]), ["-c", "echo hi"]);
+});
+
+test("an env override that is not an object is ignored", () => {
+    // The settings editor used to save env as "[object Object]", which spread into variables 0, 1, 2…
+    for (const junk of ["[object Object]", ["A=1"], null, 42]) {
+        const env = buildShellEnv({PATH: "/usr/bin"}, {version: "1", overrides: junk});
+        assert.strictEqual(env.PATH, "/usr/bin");
+        assert.ok(!("0" in env), JSON.stringify(junk));
+    }
+});
+
+test("env shows in the settings editor as JSON", () => {
+    assert.strictEqual(formatEnvSetting({EDITOR: "vim", LANG: "C"}), '{"EDITOR":"vim","LANG":"C"}');
+    assert.strictEqual(formatEnvSetting(undefined), "");
+    assert.strictEqual(formatEnvSetting(null), "");
+});
+
+test("a broken env value is shown as it is, so it can be fixed", () => {
+    assert.strictEqual(formatEnvSetting("[object Object]"), "[object Object]");
+});
+
+test("env survives a round trip through the settings editor", () => {
+    const env = {EDITOR: "vim", PATH: "/opt/bin:/usr/bin", QUOTE: "it's \"quoted\""};
+    assert.deepStrictEqual(parseEnvSetting(formatEnvSetting(env)), {env});
+});
+
+test("an empty env field removes the setting", () => {
+    assert.deepStrictEqual(parseEnvSetting(""), {env: undefined});
+    assert.deepStrictEqual(parseEnvSetting("   "), {env: undefined});
+});
+
+test("an env field that is not a JSON object is refused rather than saved", () => {
+    for (const text of ["[object Object]", "EDITOR=vim", "[1, 2]", '"text"', "42", "null"]) {
+        const result = parseEnvSetting(text);
+        assert.ok(result.error, text);
+        assert.ok(!("env" in result), text);
+    }
 });
