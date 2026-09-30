@@ -59,16 +59,12 @@ class Terminal {
 
                     let arg = step.slice(step.indexOf("(")+1, step.indexOf(")"));
 
-                    if (typeof Number(arg) === "number") {
-                        a[i] = {
-                            func,
-                            arg: [Number(arg)]
-                        };
-                        window.isTermFilterValidated = true;
-                        return true;
-                    }
-
-                    return false;
+                    a[i] = {
+                        func,
+                        arg: [Number(arg)]
+                    };
+                    window.isTermFilterValidated = true;
+                    return true;
                 });
             }
 
@@ -193,14 +189,9 @@ class Terminal {
                 }
             };
 
-            this.lastSoundFX = Date.now();
             this.socket.addEventListener("message", e => {
                 let d = Date.now();
 
-                if (d - this.lastSoundFX > 30) {
-                    // Terminal output sound disabled
-                    this.lastSoundFX = d;
-                }
                 if (d - this.lastRefit > 10000) {
                     this.fit();
                 }
@@ -300,13 +291,10 @@ class Terminal {
                     if (!this.term.hasSelection()) return false;
                     document.execCommand("copy");
                     this.term.clearSelection();
-                    this.clipboard.didCopy = true;
                 },
                 paste: () => {
                     this.write(remote.clipboard.readText());
-                    this.clipboard.didCopy = false;
-                },
-                didCopy: false
+                }
             };
 
         } else if (opts.role === "server") {

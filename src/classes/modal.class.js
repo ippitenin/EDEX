@@ -183,8 +183,6 @@ class Modal {
             window.removeEventListener("touchend", modalTouchendHandler);
         }
         dragTarget.addEventListener("touchstart", modalTouchstartHandler);
-
-        return this.id;
     }
 }
 

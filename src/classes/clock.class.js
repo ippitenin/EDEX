@@ -11,7 +11,6 @@ class Clock {
             <h1 id="mod_clock_text"><span>?</span><span>?</span><span>:</span><span>?</span><span>?</span><span>:</span><span>?</span><span>?</span></h1>
         </div>`;
 
-        this.lastTime = new Date();
 
         this.updateClock();
         this.updater = setInterval(() => {
@@ -45,7 +44,6 @@ class Clock {
         if (this.twelveHours) clockString += `<span>${this.ampm}</span>`;
 
         document.getElementById("mod_clock_text").innerHTML = clockString;
-        this.lastTime = time;
     }
 }
 

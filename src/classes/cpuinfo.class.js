@@ -20,7 +20,6 @@ class Cpuinfo {
 
             let cpuName = data.manufacturer+data.brand;
             cpuName = cpuName.substr(0, 30);
-            cpuName.substr(0, Math.min(cpuName.length, cpuName.lastIndexOf(" ")));
 
             let innercontainer = document.createElement("div");
             innercontainer.setAttribute("id", "mod_cpuinfo_innercontainer");

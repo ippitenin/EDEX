@@ -583,10 +583,7 @@ class FilesystemDisplay {
             this.space_bar.text.innerHTML = "Calculating available space...";
             this.space_bar.bar.removeAttribute("value");
 
-            window.si.fsSize().catch(() => {
-                this.space_bar.text.innerHTML = "Could not calculate mountpoint usage.";
-                this.space_bar.bar.value = 100;
-            }).then(d => {
+            window.si.fsSize().then(d => {
                 d.forEach(fsBlock => {
                     if (path.startsWith(fsBlock.mount)) {
                         this.fsBlock = fsBlock;
@@ -623,15 +620,11 @@ class FilesystemDisplay {
         // own report raced each other (#392). initUI now hands over the shell's real directory
         // through showDir, before a terminal exists, and that covers both cases.
 
-        this.openFile = (name, path, type) => { //Might add text formatting at some point, not now though - Surge
-            let block;
-
-            // _shown, not cwd: a refresh rebuilds cwd while the click that led here still refers
-            // to the listing on screen.
-            if (typeof name === "number") {
-                block = this._shown[name];
-                name = block.name;
-            }
+        // Both take the index of an entry on screen. _shown, not cwd: a refresh rebuilds cwd while
+        // the click that led here still refers to the listing being shown.
+        this.openFile = index => {
+            const block = this._shown[index];
+            const name = block.name;
 
             let mime = require("mime-types");
 
@@ -733,27 +726,22 @@ class FilesystemDisplay {
             }
         };
 
-        this.openMedia = (name, path, type) => {
-            let block, html;
-
-            // _shown, not cwd: a refresh rebuilds cwd while the click that led here still refers
-            // to the listing on screen.
-            if (typeof name === "number") {
-                block = this._shown[name];
-                name = block.name;
-            }
+        this.openMedia = index => {
+            const block = this._shown[index];
+            const name = block.name;
+            let html;
 
             block.path = block.path.replace(/\\/g, "/");
 
-            switch (type || block.type) {
+            switch (block.type) {
                 case "image":
-                    html = `<img class="fsDisp_mediaDisp" src="${window._encodePathURI(path || block.path)}" ondragstart="return false;">`;
+                    html = `<img class="fsDisp_mediaDisp" src="${window._encodePathURI(block.path)}" ondragstart="return false;">`;
                     break;
                 case "audio":
                     html = `<div>
                                 <div class="media_container" data-fullscreen="false">
                                     <audio class="media fsDisp_mediaDisp" preload="auto">
-                                        <source src="${window._encodePathURI(path || block.path)}">
+                                        <source src="${window._encodePathURI(block.path)}">
                                         Unsupported audio format!
                                     </audio>
                                     <div class="media_controls" data-state="hidden">
@@ -785,7 +773,7 @@ class FilesystemDisplay {
                     html = `<div>
                                 <div class="media_container" data-fullscreen="false">
                                     <video class="media fsDisp_mediaDisp" preload="auto">
-                                        <source src="${window._encodePathURI(path || block.path)}">
+                                        <source src="${window._encodePathURI(block.path)}">
                                         Unsupported video format!
                                     </video>
                                     <div class="media_controls" data-state="hidden">
@@ -819,7 +807,7 @@ class FilesystemDisplay {
                             </div>`;
                     break;
                 default:
-                    throw new Error("fsDisp media displayer: unknown type " + (type || block.type));
+                    throw new Error("fsDisp media displayer: unknown type " + block.type);
             }
 
             const newModal = new Modal({

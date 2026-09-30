@@ -586,7 +586,6 @@ class Keyboard {
         let d = this.container.dataset.passwordMode;
         (d === "true") ? d = "false" : d = "true";
         this.container.dataset.passwordMode = d;
-        window.passwordMode = d;
         return d;
     }
     addCircum(char) {

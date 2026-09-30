@@ -61,16 +61,8 @@ window.shortcuts = require(shortcutsFile);
 window.lastWindowState = require(lastWindowStateFile);
 
 // Load CLI parameters
-if (remote.process.argv.includes("--nointro")) {
-    window.settings.nointroOverride = true;
-} else {
-    window.settings.nointroOverride = false;
-}
-if (remote.process.argv.includes("--nocursor")) {
-    window.settings.nocursorOverride = true;
-} else {
-    window.settings.nocursorOverride = false;
-}
+window.settings.nointroOverride = remote.process.argv.includes("--nointro");
+window.settings.nocursorOverride = remote.process.argv.includes("--nocursor");
 
 // Retrieve theme override (hotswitch)
 ipc.once("getThemeOverride", (e, theme) => {
@@ -172,15 +164,13 @@ window._loadTheme = theme => {
 };
 
 function initGraphicalErrorHandling() {
-    window.edexErrorsModals = [];
     window.onerror = (msg, path, line, col, error) => {
         // Error text quotes file names, so escape before it reaches the modal's markup.
-        let errorModal = new Modal({
+        new Modal({
             type: "error",
             title: escapeHtml(error),
             message: `${escapeHtml(msg)}<br/>        at ${escapeHtml(path)}  ${escapeHtml(line)}:${escapeHtml(col)}`
         });
-        window.edexErrorsModals.push(errorModal);
 
         ipc.send("log", "error", `${error}: ${msg}`);
         ipc.send("log", "debug", `at ${path} ${line}:${col}`);
@@ -211,24 +201,16 @@ function waitForFonts() {
 function initSystemInformationProxy() {
     const { nanoid } = require("nanoid/non-secure");
 
+    // A call never rejects. _multithread.js sends no reply when systeminformation fails, so a failed
+    // call just never settles — a .catch() on one of these does nothing.
     window.si = new Proxy({}, {
-        apply: () => {throw new Error("Cannot use sysinfo proxy directly as a function")},
         set: () => {throw new Error("Cannot set a property on the sysinfo proxy")},
-        get: (target, prop, receiver) => {
-            return function(...args) {
-                let callback = (typeof args[args.length - 1] === "function") ? true : false;
-
-                return new Promise((resolve, reject) => {
-                    let id = nanoid();
-                    ipc.once("systeminformation-reply-"+id, (e, res) => {
-                        if (callback) {
-                            args[args.length - 1](res);
-                        }
-                        resolve(res);
-                    });
-                    ipc.send("systeminformation-call", prop, id, ...args);
-                });
-            };
+        get: (target, prop) => {
+            return (...args) => new Promise(resolve => {
+                let id = nanoid();
+                ipc.once("systeminformation-reply-"+id, (e, res) => resolve(res));
+                ipc.send("systeminformation-call", prop, id, ...args);
+            });
         }
     });
 }
@@ -314,61 +296,6 @@ async function bootScreenDone() {
     initGraphicalErrorHandling();
     initSystemInformationProxy();
     waitForFonts().then(initUI);
-}
-
-// Show "logo" and background grid
-async function displayTitleScreen() {
-    let bootScreen = document.getElementById("boot_screen");
-    if (bootScreen === null) {
-        bootScreen = document.createElement("section");
-        bootScreen.setAttribute("id", "boot_screen");
-        bootScreen.setAttribute("style", "z-index: 9999999");
-        document.body.appendChild(bootScreen);
-    }
-    bootScreen.innerHTML = "";
-    window.audioManager.theme.play();
-
-    await _delay(400);
-
-    document.body.setAttribute("class", "");
-    bootScreen.setAttribute("class", "center");
-    bootScreen.innerHTML = "<h1>EDEX</h1>";
-    let title = document.querySelector("section > h1");
-
-    await _delay(200);
-
-    document.body.setAttribute("class", "solidBackground");
-
-    await _delay(100);
-
-    title.setAttribute("style", `background-color: rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});border-bottom: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(300);
-
-    title.setAttribute("style", `border: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(100);
-
-    title.setAttribute("style", "");
-    title.setAttribute("class", "glitch");
-
-    await _delay(500);
-
-    document.body.setAttribute("class", "");
-    title.setAttribute("class", "");
-    title.setAttribute("style", `border: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(1000);
-    if (window.term) {
-        bootScreen.remove();
-        return true;
-    }
-    initGraphicalErrorHandling();
-    initSystemInformationProxy();
-    waitForFonts().then(() => {
-        bootScreen.remove();
-        initUI();
-    });
 }
 
 // Returns the user's desired display name
@@ -835,7 +762,7 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>nointro</td>
-                        <td>Skip the intro boot log and logo${(window.settings.nointroOverride) ? " (Currently overridden by CLI flag)" : ""}</td>
+                        <td>Skip the intro boot log${(window.settings.nointroOverride) ? " (Currently overridden by CLI flag)" : ""}</td>
                         <td><select id="settingsEditor-nointro">
                             <option>${escapeHtml(window.settings.nointro)}</option>
                             <option>${!window.settings.nointro}</option>
@@ -867,7 +794,7 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>allowWindowed</td>
-                        <td>Allow using F11 key to set the UI in windowed mode</td>
+                        <td>Allow F11 to take the window out of fullscreen</td>
                         <td><select id="settingsEditor-allowWindowed">
                             <option>${escapeHtml(window.settings.allowWindowed)}</option>
                             <option>${!window.settings.allowWindowed}</option>
@@ -883,7 +810,7 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>excludeThreadsFromToplist</td>
-                        <td>Display threads in the top processes list</td>
+                        <td>Hide threads from the top processes list</td>
                         <td><select id="settingsEditor-excludeThreadsFromToplist">
                             <option>${escapeHtml(window.settings.excludeThreadsFromToplist)}</option>
                             <option>${!window.settings.excludeThreadsFromToplist}</option>

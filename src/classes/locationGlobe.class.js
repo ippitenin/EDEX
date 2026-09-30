@@ -133,12 +133,6 @@ class LocationGlobe {
         }, 4000);
     }
 
-    addRandomConnectedMarkers() {
-        const randomLat = this.getRandomInRange(40, 90, 3);
-        const randomLong = this.getRandomInRange(-180, 0, 3);
-        this.globe.addMarker(randomLat, randomLong, '');
-        this.globe.addMarker(randomLat - 20, randomLong + 150, '', true);
-    }
     addTemporaryConnectedMarker(ip) {
         let data = window.mods.netstat.geoLookup.get(ip);
         let geo = (data !== null ? data.location : {});
@@ -165,9 +159,6 @@ class LocationGlobe {
             pin.remove();
         });
         this.globe.pins = [];
-    }
-    getRandomInRange(from, to, fixed) {
-        return (Math.random() * (to - from) + from).toFixed(fixed) * 1;
     }
     updateLoc() {
         if (window.mods.netstat.offline) {
@@ -199,11 +190,10 @@ class LocationGlobe {
             document.querySelector("i.mod_globe_headerInfo").innerText = `${newgeo.latitude}, ${newgeo.longitude}`;
             this.removePins();
             this.removeMarkers();
-            //this.addRandomConnectedPoints();
             this.conns = [];
 
-            this._locPin = this.globe.addPin(newgeo.latitude, newgeo.longitude, "", 1.2);
-            this._locMarker = this.globe.addMarker(newgeo.latitude, newgeo.longitude, "", false, 1.2);
+            this.globe.addPin(newgeo.latitude, newgeo.longitude, "", 1.2);
+            this.globe.addMarker(newgeo.latitude, newgeo.longitude, "", false, 1.2);
         }
 
         this.lastgeo = newgeo;
