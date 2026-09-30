@@ -40,7 +40,7 @@ exports.default = async function(context) {
             `CSC_NAME asked for "${process.env.CSC_NAME}" but the app was signed ad-hoc.`,
             "Check that the certificate exists and is trusted for code signing:",
             "    security find-identity -v -p codesigning"
-        ].join(" "));
+        ].join("\n"));
     }
 
     console.warn("  • signed ad-hoc: macOS will ask for every permission again after each rebuild, see README.md");
