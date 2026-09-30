@@ -1,5 +1,6 @@
 // Helpers for the main process: command-line parsing, websocket origin checks, the parsers for the
-// platform tools the terminal shells out to, and the choices made when a window or a tab opens.
+// platform tools the terminal shells out to, the choices made when a window or a tab opens, and where
+// the Finder service helper lives.
 //
 // These are the pieces where a silent mistake is expensive — a broken origin check exposes the
 // terminal socket, a broken parser makes the process readout go blank — so they live here,
@@ -114,6 +115,34 @@ function firstFreeSlot(slots) {
     return Object.keys(slots).find(key => slots[key] === null) ?? null;
 }
 
+// Must match HELPER_NAME in build/afterPack.js, which names the bundle it embeds.
+const SERVICE_HELPER_NAME = "EDEX Service";
+
+/**
+ * Finds the "Open in EDEX" helper inside the running app, given app.getPath("exe").
+ *
+ * Returns null unless the app sits directly in /Applications or ~/Applications. Any other copy —
+ * the build output under ~/Library/Caches, a mounted disk image — shares the helper's bundle id,
+ * and registering it would give Finder a second entry, or one that points into a volume about to
+ * be ejected.
+ */
+function finderServiceHelper(exePath, home) {
+    if (typeof exePath !== "string" || !path.isAbsolute(exePath)) return null;
+    const macosDir = path.dirname(exePath);
+    const contentsDir = path.dirname(macosDir);
+    const bundle = path.dirname(contentsDir);
+    if (path.basename(macosDir) !== "MacOS" || path.basename(contentsDir) !== "Contents" || !bundle.endsWith(".app")) {
+        return null;
+    }
+
+    const parent = path.dirname(bundle);
+    const installed = [path.join(path.sep, "Applications")];
+    if (typeof home === "string" && home) installed.push(path.join(home, "Applications"));
+    if (!installed.includes(parent)) return null;
+
+    return path.join(bundle, "Contents", "Library", "Services", `${SERVICE_HELPER_NAME}.app`, "Contents", "MacOS", SERVICE_HELPER_NAME);
+}
+
 module.exports = {
     extractDirFromArgv,
     isAllowedOrigin,
@@ -122,5 +151,6 @@ module.exports = {
     pickNextDisplay,
     pickStartDisplay,
     resolveSpawnCwd,
-    firstFreeSlot
+    firstFreeSlot,
+    finderServiceHelper
 };

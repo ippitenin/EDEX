@@ -10,7 +10,8 @@ const {
     pickNextDisplay,
     pickStartDisplay,
     resolveSpawnCwd,
-    firstFreeSlot
+    firstFreeSlot,
+    finderServiceHelper
 } = require("../src/utils/system.js");
 
 // A stand-in filesystem: only the listed paths exist, and only as directories.
@@ -171,4 +172,36 @@ test("firstFreeSlot reports when every slot is taken", () => {
     assert.strictEqual(firstFreeSlot({3002: {}, 3003: {}}), null);
     assert.strictEqual(firstFreeSlot({}), null);
     assert.strictEqual(firstFreeSlot(null), null);
+});
+
+test("finderServiceHelper finds the helper inside an installed app", () => {
+    const helper = "Contents/Library/Services/EDEX Service.app/Contents/MacOS/EDEX Service";
+    assert.strictEqual(
+        finderServiceHelper("/Applications/EDEX.app/Contents/MacOS/EDEX", "/Users/me"),
+        `/Applications/EDEX.app/${helper}`
+    );
+    assert.strictEqual(
+        finderServiceHelper("/Users/me/Applications/EDEX.app/Contents/MacOS/EDEX", "/Users/me"),
+        `/Users/me/Applications/EDEX.app/${helper}`
+    );
+});
+
+test("finderServiceHelper leaves copies outside an Applications folder alone", () => {
+    // Registering any of these would give macOS a second provider with the same bundle id: a
+    // duplicate menu entry, or one pointing into a disk image about to be ejected.
+    for (const exe of [
+        "/Users/me/Library/Caches/edex-build/mac-arm64/EDEX.app/Contents/MacOS/EDEX",
+        "/Users/me/Library/Caches/edex-build/dev/EDEX.app/Contents/MacOS/EDEX",
+        "/Volumes/EDEX 2.4.2/EDEX.app/Contents/MacOS/EDEX",
+        "/Users/me/Desktop/VibeCode/EDEX/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Applications/Tools/EDEX.app/Contents/MacOS/EDEX"
+    ]) {
+        assert.strictEqual(finderServiceHelper(exe, "/Users/me"), null, exe);
+    }
+});
+
+test("finderServiceHelper needs an executable inside an app bundle", () => {
+    for (const exe of ["/Applications/edex", "/Applications/EDEX.app", "", undefined, null]) {
+        assert.strictEqual(finderServiceHelper(exe, "/Users/me"), null, String(exe));
+    }
 });

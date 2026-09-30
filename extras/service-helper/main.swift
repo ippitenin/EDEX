@@ -74,6 +74,19 @@ final class ServiceProvider: NSObject {
     }
 }
 
+// EDEX runs this with --register on every launch. LaunchServices registers the apps nested in
+// Contents/Frameworks along with EDEX, but not this one in Contents/Library/Services, and pbs only
+// reads NSServices from registered bundles: after a fresh install the menu entry was simply absent.
+// macOS itself never passes the flag, so a real service request goes on to the provider below.
+if CommandLine.arguments.contains("--register") {
+    let status = LSRegisterURL(Bundle.main.bundleURL as CFURL, true)
+    if status != noErr {
+        NSLog("EDEX Service: LSRegisterURL failed with \(status)")
+    }
+    NSUpdateDynamicServices()
+    exit(status == noErr ? 0 : 1)
+}
+
 let app = NSApplication.shared
 let provider = ServiceProvider()
 NSApp.servicesProvider = provider

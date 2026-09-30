@@ -93,13 +93,17 @@ not been attempted.
 - **"Open in EDEX"** — right-click a folder in Finder, get a terminal in it. The entry sits in
   the main context menu next to Terminal's own, and opens the folder in a free tab when EDEX is
   already running. A small Swift agent embedded in the bundle publishes the service, since
-  Electron cannot register one itself. See [extras/](extras/).
+  Electron cannot register one itself, and EDEX registers the agent with macOS on every launch.
+  See [extras/](extras/).
 - **Files dropped on the window are typed into the active tab as paths**, escaped the way
   Terminal.app does it. That is also what lets Claude Code turn a dropped image into an
   attachment.
 
 ## Version history
 
+- **2.4.2** (2026-09-30) — "Open in EDEX" is back in the Finder menu. macOS registers the app but
+  not the service agent inside it, so after a reinstall the entry was gone; EDEX now registers the
+  agent itself on every launch.
 - **2.4.1** (2026-09-30) — a tidy-up after the summer's branches, and the holes it turned up.
   Clicking a folder in the filesystem panel no longer runs anything in its name; file contents,
   volume labels, settings values and theme names are escaped or confined; the one-client limit on

@@ -8,7 +8,8 @@ const {Arch} = require("builder-util");
 const {swiftTargetForArch} = require("./lib/arch.js");
 const {stripFinderInfo} = require("./lib/xattr.js");
 
-// Must match CFBundleName, CFBundleExecutable and NSPortName in extras/service-helper/Info.plist.
+// Must match CFBundleName, CFBundleExecutable and NSPortName in extras/service-helper/Info.plist,
+// and SERVICE_HELPER_NAME in src/utils/system.js, which finds the helper to register it.
 const HELPER_NAME = "EDEX Service";
 exports.HELPER_NAME = HELPER_NAME;
 

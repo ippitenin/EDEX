@@ -11,6 +11,7 @@ const path = require("path");
 const {Arch} = require("builder-util");
 const {swiftTargetForArch} = require("../build/lib/arch.js");
 const {HELPER_NAME} = require("../build/afterPack.js");
+const {finderServiceHelper} = require("../src/utils/system.js");
 
 const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf-8");
@@ -62,4 +63,13 @@ test("the helper bundle is named the way its Info.plist says", () => {
     assert.strictEqual(plistString(plist, "CFBundleName"), HELPER_NAME);
     assert.strictEqual(plistString(plist, "CFBundleExecutable"), HELPER_NAME);
     assert.strictEqual(plistString(plist, "NSPortName"), HELPER_NAME);
+});
+
+test("the app registers the helper afterPack embeds", () => {
+    // The helper is not registered by macOS together with the app; EDEX runs it with --register on
+    // every launch. A renamed bundle or a dropped flag would quietly bring the missing menu entry back.
+    const helper = finderServiceHelper("/Applications/EDEX.app/Contents/MacOS/EDEX", "/Users/me");
+    assert.ok(helper.endsWith(`/Contents/Library/Services/${HELPER_NAME}.app/Contents/MacOS/${HELPER_NAME}`), helper);
+    assert.ok(read("src/_boot.js").includes(`["--register"]`), "_boot.js passes the flag");
+    assert.ok(read("extras/service-helper/main.swift").includes(`"--register"`), "main.swift reads the flag");
 });

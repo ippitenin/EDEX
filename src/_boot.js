@@ -1,6 +1,7 @@
 const signale = require("signale");
 const electron = require("electron");
 const {app, BrowserWindow, dialog, shell, ipcMain: ipc} = electron;
+const {execFile} = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const url = require("url");
@@ -8,7 +9,7 @@ const which = require("which");
 const remoteMain = require("@electron/remote/main");
 const Terminal = require("./classes/terminal.class.js").Terminal;
 const {findFreePort} = require("./utils/net.js");
-const {extractDirFromArgv, pickStartDisplay, resolveSpawnCwd, firstFreeSlot} = require("./utils/system.js");
+const {extractDirFromArgv, pickStartDisplay, resolveSpawnCwd, firstFreeSlot, finderServiceHelper} = require("./utils/system.js");
 const {mergeMissingSettings, mergeMissingShortcuts, isPlainObject, buildShellEnv, preferredPort, parseShellArgs} = require("./utils/config.js");
 
 // Declared ahead of everything that can throw: the crash handler below reads them, and a let still
@@ -236,6 +237,21 @@ function logVersion() {
         versionHistory[version].lastSeen = Date.now();
     }
     fs.writeFileSync(versionHistoryPath, JSON.stringify(versionHistory, 0, 2), {encoding:"utf-8"});
+}
+
+// Registering the app with LaunchServices also registers the apps nested in Contents/Frameworks,
+// but not the one in Contents/Library/Services, and without a registration its NSServices never
+// reach the services menu. A fresh install therefore had no "Open in EDEX" until something
+// registered the helper by hand, so the helper is asked to do it itself on every launch. Nothing
+// waits for it: at worst the entry stays missing, as it was.
+function registerFinderService() {
+    if (process.platform !== "darwin") return;
+    const helper = finderServiceHelper(app.getPath("exe"), app.getPath("home"));
+    // A build made without swiftc ships without the helper.
+    if (!helper || !fs.existsSync(helper)) return;
+    execFile(helper, ["--register"], err => {
+        if (err) signale.warn("Could not register the Finder service:", err.message);
+    });
 }
 
 seedSettings(settingsFile, defaultSettings);
@@ -512,6 +528,7 @@ async function onReady() {
     signale.pending("Starting multithreaded calls controller...");
     require("./_multithread.js");
 
+    registerFinderService();
     createWindow(settings);
 }
 

@@ -43,7 +43,7 @@ npm run build-darwin     # signed .dmg into dist/
   loopback ports. Look before writing something similar:
   - `sanitize.js` — `escapeHtml`, `purifyCSS`, `quoteForShell`, `escapePathForPaste`, `encodePathURI`
   - `system.js` — `extractDirFromArgv`, `isAllowedOrigin`, `parseProcessName`, `parseCwdOutput`,
-    `pickNextDisplay`, `pickStartDisplay`, `resolveSpawnCwd`, `firstFreeSlot`
+    `pickNextDisplay`, `pickStartDisplay`, `resolveSpawnCwd`, `firstFreeSlot`, `finderServiceHelper`
   - `config.js` — `mergeMissingSettings`, `mergeMissingShortcuts`, `buildShellEnv`,
     `formatEnvSetting` / `parseEnvSetting`, `preferredPort`, `parseShellArgs`
   - `keyboard.js` — `codeForKeySlot`, `applyDeadKey`, `CTRLSEQ`, `KEY_SEQUENCES`, `parseShortcutTrigger`
@@ -109,3 +109,7 @@ npm run build-darwin     # signed .dmg into dist/
   running bundle's `Info.plist`. That is what `build/dev-app.js` exists for.
 - **The Finder service only finds the installed app** (`com.edex.ui`). The dev bundle has its own
   bundle id on purpose, so the service does nothing for `npm start` or `npm run start-app`.
+- **LaunchServices does not register the Finder helper along with the app.** `lsregister` on
+  `EDEX.app` covers `Contents/Frameworks`, not `Contents/Library/Services`, and an unregistered
+  helper means no menu entry. EDEX runs the helper with `--register` on every launch from an
+  Applications folder, so after an install the entry appears once the app has been started.

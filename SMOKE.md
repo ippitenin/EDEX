@@ -130,6 +130,8 @@ A dev server on port 3000 used to crash EDEX on launch with `EADDRINUSE`.
 
 ## Finder integration
 
+- [ ] After installing and launching EDEX once, `/System/Library/CoreServices/pbs -dump | grep
+      com.edex.ui.service` finds the service — no `lsregister` on the helper by hand
 - [ ] Right-click a folder in Finder with EDEX closed → **Открыть в EDEX** → app starts in that
       folder
 - [ ] Same with EDEX already running → folder opens in a free tab

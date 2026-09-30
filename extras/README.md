@@ -22,6 +22,24 @@ macOS puts an entry in that part of the menu only when an **application** publis
 The built agent lives at `EDEX.app/Contents/Library/Services/EDEX Service.app`. Because it
 belongs to a real bundle, the menu entry also picks up the EDEX icon.
 
+### Registration
+
+The services menu is built from bundles LaunchServices knows about, and it does not learn about
+this one on its own. Registering `EDEX.app` also registers the apps nested in
+`Contents/Frameworks`, but not the ones in `Contents/Library/Services`: after removing the old copy
+and installing a new one, the agent was in place, signed and working, and the entry was still
+missing.
+
+So EDEX runs the agent with `--register` on every launch. The agent calls `LSRegisterURL` on its
+own bundle and `NSUpdateDynamicServices`, then exits; macOS never passes that flag, so a service
+request is unaffected. This happens only when the app sits directly in `/Applications` or
+`~/Applications` — a copy in the build output or on a mounted disk image would give Finder a
+second provider with the same bundle id.
+
+Moving the agent to a folder LaunchServices does descend into was the alternative, and both
+candidates are wrong for it: `Contents/Applications` makes it show up in Spotlight as an app of its
+own, and `Contents/Library/LoginItems` is for login items.
+
 ### Why not an Automator quick action
 
 An Automator workflow dropped in `~/Library/Services` was the first approach, and it is the
@@ -72,11 +90,12 @@ installed copy.
 
 ## Troubleshooting
 
-If the entry does not show up after installing a new build:
+If the entry does not show up after installing a new build, launch EDEX once — that is what
+registers the agent. If it is still missing, register the agent itself, not the app:
 
 ```sh
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/EDEX.app
-/System/Library/CoreServices/pbs -flush
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/EDEX.app/Contents/Library/Services/EDEX Service.app"
+/System/Library/CoreServices/pbs -update
 killall Finder
 ```
 
