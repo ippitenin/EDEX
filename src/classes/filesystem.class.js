@@ -258,8 +258,10 @@ class FilesystemDisplay {
                     }
                 });
 
+                // The raw name: it is escaped where it meets markup and quoted where it meets the
+                // shell. Storing it pre-escaped made a folder called R&D come out as cd "R&amp;D".
                 let e = {
-                    name: window._escapeHtml(file),
+                    name: file,
                     path: path.resolve(tcwd, file),
                     type: "other",
                     category: "other",
@@ -370,15 +372,22 @@ class FilesystemDisplay {
             }
             this.setTitleDir(isDiskView ? "Showing available block devices" : this.dirpath);
 
+            // The click handlers below are strings in an onclick attribute, so nothing from the
+            // disk may be spliced into them: HTML escaping is undone before the JavaScript runs,
+            // and a quote in a file name broke out of the string. They carry only an index into
+            // fsDisp._shown, which is assigned together with the markup it describes, and whatever
+            // goes to the shell is quoted by quoteForShell — hand-made double quotes still ran
+            // $(...) in a folder name the moment it was clicked.
             let filesDOM = ``;
             blockList.forEach((e, blockIndex) => {
                 let hidden = e.hidden ? " hidden" : "";
+                const entry = `fsDisp._shown[${blockIndex}]`;
 
                 let cmdPrefix = `if (window.keyboard.container.dataset.isCtrlOn == "true") {
-                                electron.shell.openPath(fsDisp.cwd[${blockIndex}].path);
+                                electron.shell.openPath(${entry}.path);
                                 electronWin.minimize();
                             } else if (window.keyboard.container.dataset.isShiftOn == "true") {
-                                window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"");
+                                window.term[window.currentTerm].write(window._quoteForShell(${entry}.path));
                             } else {
                           `.replace(/\n+ */g, ''); // Minify
 
@@ -388,27 +397,27 @@ class FilesystemDisplay {
 
                 if (!this._noTracking) {
                     if (e.type === "dir" || e.type.endsWith("Dir")) {
-                        cmd = `window.term[window.currentTerm].writelr("cd \\""+fsDisp.cwd[${blockIndex}].name+"\\"")`;
+                        cmd = `window.term[window.currentTerm].writelr("cd "+window._quoteForShell(${entry}.name))`;
                     } else if (e.type === "up") {
                         cmd = `window.term[window.currentTerm].writelr("cd ..")`;
                     } else if (e.type === "disk" || e.type === "rom" || e.type === "usb") {
                         if (process.platform === "win32") {
-                            cmd = `window.term[window.currentTerm].writelr("${e.path.replace(/\\/g, '')}")`;
+                            cmd = `window.term[window.currentTerm].writelr(${entry}.path.replace(/\\\\/g, ""))`;
                         } else {
-                            cmd = `window.term[window.currentTerm].writelr("cd \\"${e.path.replace(/\\/g, '')}\\"")`;
+                            cmd = `window.term[window.currentTerm].writelr("cd "+window._quoteForShell(${entry}.path))`;
                         }
                     } else {
-                        cmd = `window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"")`;
+                        cmd = `window.term[window.currentTerm].write(window._quoteForShell(${entry}.path))`;
                     }
                 } else {
                     if (e.type === "dir" || e.type.endsWith("Dir")) {
-                        cmd = `window.fsDisp.readFS(fsDisp.cwd[${blockIndex}].path)`;
+                        cmd = `window.fsDisp.readFS(${entry}.path)`;
                     } else if (e.type === "up") {
                         cmd = `window.fsDisp.readFS(path.resolve(window.fsDisp.dirpath, ".."))`;
                     } else if (e.type === "disk" || e.type === "rom" || e.type === "usb") {
-                        cmd = `window.fsDisp.readFS("${e.path.replace(/\\/g, '')}")`;
+                        cmd = `window.fsDisp.readFS(${entry}.path)`;
                     } else {
-                        cmd = `window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"")`;
+                        cmd = `window.term[window.currentTerm].write(window._quoteForShell(${entry}.path))`;
                     }
                 }
 
@@ -433,10 +442,10 @@ class FilesystemDisplay {
                 }
 
                 if (e.type === "edex-theme") {
-                    cmd = `window.themeChanger("${e.name.slice(0, -5)}")`;
+                    cmd = `window.themeChanger(${entry}.name.slice(0, -5))`;
                 }
                 if (e.type === "edex-kblayout") {
-                    cmd = `window.remakeKeyboard("${e.name.slice(0, -5)}")`;
+                    cmd = `window.remakeKeyboard(${entry}.name.slice(0, -5))`;
                 }
                 if (e.type === "edex-settings") {
                     cmd = `window.openSettings()`;
@@ -517,7 +526,7 @@ class FilesystemDisplay {
 
                 // Handle displayable media
                 if (e.type === 'video' || e.type === 'audio' || e.type === 'image') {
-                    this.cwd[blockIndex].type = e.type;
+                    originBlockList[blockIndex].type = e.type;
                     cmd = `window.fsDisp.openMedia(${blockIndex})`;
                 }
 
@@ -536,12 +545,13 @@ class FilesystemDisplay {
                                 <svg viewBox="0 0 ${icon.width} ${icon.height}" fill="${this.iconcolor}">
                                     ${icon.svg}
                                 </svg>
-                                <h3>${e.name}</h3>
+                                <h3>${window._escapeHtml(e.name)}</h3>
                                 <h4>${type}</h4>
                                 <h4>${e.size}</h4>
                                 <h4>${e.lastAccessed}</h4>
                             </div>`;
             });
+            this._shown = originBlockList;
             this.filesContainer.innerHTML = filesDOM;
 
             if (this.filesContainer.getAttribute("class").endsWith("disks")) {
@@ -613,8 +623,10 @@ class FilesystemDisplay {
         this.openFile = (name, path, type) => { //Might add text formatting at some point, not now though - Surge
             let block;
 
+            // _shown, not cwd: a refresh rebuilds cwd while the click that led here still refers
+            // to the listing on screen.
             if (typeof name === "number") {
-                block = this.cwd[name];
+                block = this._shown[name];
                 name = block.name;
             }
 
@@ -656,7 +668,7 @@ class FilesystemDisplay {
                     const newModal = new Modal(
                         {
                             type: "custom",
-                            title: _escapeHtml(name),
+                            title: window._escapeHtml(name),
                             html: html
                         }
                     );
@@ -679,19 +691,35 @@ class FilesystemDisplay {
                                 console.log(err);
                             };
                             window.keyboard.detach();
-                            new Modal(
+                            // The path stays in this closure rather than in an onclick string, where
+                            // a quote in the file name broke out of it. Each editor saves its own
+                            // textarea: they used to share an id, and the second one saved the first.
+                            let textarea, status;
+                            const editor = new Modal(
                                 {
                                     type: "custom",
-                                    title: _escapeHtml(name),
-                                    html: `<textarea id="fileEdit" rows="40" cols="150" spellcheck="false">${data}</textarea><p id="fedit-status"></p>`,
+                                    title: window._escapeHtml(name),
+                                    html: `<textarea class="fileEdit" rows="40" cols="150" spellcheck="false"></textarea><p class="fedit-status"></p>`,
                                     buttons: [
-                                        {label:"Save to Disk",action:`window.writeFile('${block.path}')`}
+                                        {label: "Save to Disk", action: () => {
+                                            fs.writeFile(block.path, textarea.value, "utf-8", err => {
+                                                status.innerHTML = err
+                                                    ? `<i>Could not save: ${window._escapeHtml(err.message)}</i>`
+                                                    : "<i>File saved.</i>";
+                                            });
+                                        }}
                                     ]
                                 }, () => {
                                     window.keyboard.attach();
                                     window.term[window.currentTerm].term.focus();
                                 }
                             );
+                            const editorEl = document.getElementById("modal_"+editor.id);
+                            textarea = editorEl.querySelector("textarea.fileEdit");
+                            status = editorEl.querySelector("p.fedit-status");
+                            // Through .value, never through the HTML parser: a file containing
+                            // </textarea> closed the element and whatever followed ran as markup.
+                            textarea.value = data;
                         });
                    break;
                 }
@@ -701,8 +729,10 @@ class FilesystemDisplay {
         this.openMedia = (name, path, type) => {
             let block, html;
 
+            // _shown, not cwd: a refresh rebuilds cwd while the click that led here still refers
+            // to the listing on screen.
             if (typeof name === "number") {
-                block = this.cwd[name];
+                block = this._shown[name];
                 name = block.name;
             }
 
@@ -787,7 +817,7 @@ class FilesystemDisplay {
 
             const newModal = new Modal({
                 type: "custom",
-                title: _escapeHtml(name),
+                title: window._escapeHtml(name),
                 html
             });
             if (block.type === "audio" || block.type === "video") {

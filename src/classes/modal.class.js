@@ -58,8 +58,15 @@ class Modal {
             <h1>${this.title}</h1>
             ${this.type === "custom" ? options.html : "<h5>"+this.message+"</h5>"}
             <div>`;
-            buttons.forEach(b => {
-                DOMstring += `<button onclick="${b.action}">${b.label}</button>`;
+            // An action is either code for an onclick attribute or a function. Functions are wired
+            // up below, after the element exists: they are how a caller hands over a value, such as
+            // a path, that must never be spliced into markup.
+            buttons.forEach((b, index) => {
+                if (typeof b.action === "function") {
+                    DOMstring += `<button data-modal-button="${index}">${b.label}</button>`;
+                } else {
+                    DOMstring += `<button onclick="${b.action}">${b.label}</button>`;
+                }
             });
         DOMstring += `</div>
         </div>`;
@@ -94,6 +101,11 @@ class Modal {
         let tmp = document.createElement("div");
         tmp.innerHTML = DOMstring;
         let element = tmp.firstChild;
+        // Only the modal's own buttons carry the attribute; a PDF viewer's controls inside the html
+        // are buttons too, and are left alone.
+        element.querySelectorAll("button[data-modal-button]").forEach(button => {
+            button.addEventListener("click", buttons[Number(button.dataset.modalButton)].action);
+        });
 
         element.addEventListener("mousedown", () => {
             this.focus();
