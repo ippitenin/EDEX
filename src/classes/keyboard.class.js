@@ -60,10 +60,16 @@ class Keyboard {
         // Parse keymap and create DOM
         Object.keys(layout).forEach(row => {
             this.container.innerHTML += `<div class="keyboard_row" id="`+row+`"></div>`;
-            layout[row].forEach(keyObj => {
+            layout[row].forEach((keyObj, index) => {
 
                 let key = document.createElement("div");
                 key.setAttribute("class", "keyboard_key");
+
+                // Remember which physical key this slot stands for. It has to be an attribute:
+                // the innerHTML += above rebuilds every row made so far, so a reference to the
+                // element taken here would point at a node that is no longer in the document.
+                let code = window._codeForKeySlot(row, index);
+                if (code !== null) key.dataset.code = code;
 
                 if (keyObj.cmd === " ") {
                     key.setAttribute("id", "keyboard_spacebar");
@@ -119,8 +125,12 @@ class Keyboard {
             });
         });
 
+        this._keyByCode = new Map();
+
         this.container.childNodes.forEach(row => {
             row.childNodes.forEach(key => {
+
+                if (key.dataset.code) this._keyByCode.set(key.dataset.code, key);
 
                 let enterElements = document.querySelectorAll(".keyboard_enter");
 
@@ -257,6 +267,13 @@ class Keyboard {
 
         // Bind actual keyboard actions to on-screen animations (for use without a touchscreen)
         let findKey = e => {
+            // Character keys go by physical position first. What they type depends on the
+            // system input language — under a Russian layout the H key reports "р", which no
+            // slot carries, and "," comes from the number row — but the key that went down is
+            // the same one either way, and that is the one to light up.
+            let physical = this._keyByCode.get(e.code);
+            if (physical) return physical;
+
             // Fix incorrect querySelector error
             let physkey;
             (e.key === "\"") ? physkey = `\\"` : physkey = e.key;

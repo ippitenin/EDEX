@@ -6,9 +6,12 @@ window.eval = global.eval = function () {
 const {escapeHtml, purifyCSS, quoteForShell} = require("./utils/sanitize.js");
 // Window helpers — same story, see utils/system.js
 const {pickNextDisplay} = require("./utils/system.js");
+// Which physical key each slot of the on-screen keyboard stands for, see utils/keyboard.js
+const {codeForKeySlot} = require("./utils/keyboard.js");
 window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
+window._codeForKeySlot = codeForKeySlot;
 window._encodePathURI = uri => {
     return encodeURI(uri).replace(/#/g, "%23");
 };

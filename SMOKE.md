@@ -34,6 +34,16 @@ a terminal session, or the shell inherits that session's environment.
 - [ ] Tab title shows the running process (run `top`, then quit it)
 - [ ] Copy and paste through the app shortcuts
 
+## On-screen keyboard
+
+Keys used to light up only when the character typed existed in the on-screen layout, so under a
+Russian input source the letters stayed dark.
+
+- [ ] Type with an English input source — every key lights up under its own label
+- [ ] Switch macOS to Russian and type letters, digits and punctuation — the key in the same
+      physical position lights up, with and without Shift
+- [ ] Space, Enter, Backspace, arrows and the modifiers still light up in both
+
 ## Tabs
 
 - [ ] Click each of the four EMPTY tabs in turn — every one opens a working shell
