@@ -1,4 +1,7 @@
-// Fitting a path into a space too narrow for it.
+// Paths the renderer builds or shows: fitting one into a space too narrow for it, and turning a
+// name from the settings into a file inside one known folder.
+//
+// Fitting a path into a space too narrow for it:
 //
 // The filesystem panel shows the working directory in its title bar, and a deep path simply ran
 // out of the panel and over the keyboard. What matters in such a path is where it starts and
@@ -10,6 +13,8 @@
 // test suite drive it with a plain character count.
 
 "use strict";
+
+const path = require("path");
 
 const ELLIPSIS = "…";
 
@@ -69,4 +74,19 @@ function shortenPath(fullPath, fits) {
     return ELLIPSIS;
 }
 
-module.exports = {shortenPath};
+/**
+ * Turns a theme or keyboard layout name into the file it names inside dir, or null when the name
+ * could point anywhere else.
+ *
+ * The names come from settings.json and from the hotswitch message, and go straight into a
+ * require(). Joined as they were, "../../somewhere/x" loaded a file from outside the folder.
+ * Rejecting separators and the two dot entries is enough to keep the result in dir; names that
+ * merely start with a dot, contain spaces or are not Latin are fine.
+ */
+function resolveNamedFile(dir, name, ext) {
+    if (typeof name !== "string" || name === "" || name === "." || name === "..") return null;
+    if (/[/\\\0]/.test(name)) return null;
+    return path.join(dir, name + ext);
+}
+
+module.exports = {shortenPath, resolveNamedFile};

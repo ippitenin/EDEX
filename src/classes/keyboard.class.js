@@ -59,15 +59,19 @@ class Keyboard {
 
         // Parse keymap and create DOM
         Object.keys(layout).forEach(row => {
-            this.container.innerHTML += `<div class="keyboard_row" id="`+row+`"></div>`;
+            // An element with the id set as a property: the row name comes from the layout file,
+            // which people download, and it used to be spliced into markup as it was.
+            const rowEl = document.createElement("div");
+            rowEl.className = "keyboard_row";
+            rowEl.id = row;
+            this.container.appendChild(rowEl);
             layout[row].forEach((keyObj, index) => {
 
                 let key = document.createElement("div");
                 key.setAttribute("class", "keyboard_key");
 
-                // Remember which physical key this slot stands for. It has to be an attribute:
-                // the innerHTML += above rebuilds every row made so far, so a reference to the
-                // element taken here would point at a node that is no longer in the document.
+                // Remember which physical key this slot stands for; _keyByCode below is built
+                // from it once every row is in place.
                 let code = window._codeForKeySlot(row, index);
                 if (code !== null) key.dataset.code = code;
 
@@ -121,7 +125,7 @@ class Keyboard {
                     }
                 });
 
-                document.getElementById(row).appendChild(key);
+                rowEl.appendChild(key);
             });
         });
 

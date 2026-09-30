@@ -458,8 +458,10 @@ class Terminal {
                 port: this.port,
                 clientTracking: true,
                 verifyClient: info => {
-                    // Single-client limit
-                    if (this.wss.clients.length >= 1) return false;
+                    // Single-client limit. clients is a Set: this compared .length, which is
+                    // undefined, so the limit never applied — and isAllowedOrigin lets any local
+                    // process without an Origin header through.
+                    if (this.wss.clients.size >= 1) return false;
                     // Only the local EDEX renderer, which loads from file://, may attach —
                     // see isAllowedOrigin and its tests.
                     return this._isAllowedOrigin(info.origin);

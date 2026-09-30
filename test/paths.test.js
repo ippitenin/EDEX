@@ -2,7 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert");
-const {shortenPath} = require("../src/utils/paths.js");
+const path = require("path");
+const {shortenPath, resolveNamedFile} = require("../src/utils/paths.js");
 
 // The renderer measures in pixels; one unit per character is enough to pin the logic down.
 const within = limit => text => text.length <= limit;
@@ -85,4 +86,27 @@ test("odd input is coerced instead of thrown on", () => {
     assert.strictEqual(shortenPath("", within(10)), "");
     assert.strictEqual(shortenPath("/", within(10)), "/");
     assert.strictEqual(shortenPath(12345, within(10)), "12345");
+});
+
+const THEMES = "/Users/me/Library/Application Support/EDEX/themes";
+
+test("a theme name becomes a file inside the themes folder", () => {
+    for (const name of ["tron", "Tron Disrupted", "тема", "..foo", ".hidden", "a.b"]) {
+        const file = resolveNamedFile(THEMES, name, ".json");
+        assert.strictEqual(file, path.join(THEMES, name + ".json"), name);
+        assert.strictEqual(path.dirname(file), THEMES, name);
+    }
+});
+
+test("a name that could point outside the folder is refused", () => {
+    // Settings can be edited by hand, and the name ends up in a require().
+    for (const name of ["../settings", "a/b", "/etc/passwd", "a\\b", "a\0b", ".", "..", ""]) {
+        assert.strictEqual(resolveNamedFile(THEMES, name, ".json"), null, JSON.stringify(name));
+    }
+});
+
+test("a missing or non-string name is refused", () => {
+    for (const name of [undefined, null, 42, {}]) {
+        assert.strictEqual(resolveNamedFile(THEMES, name, ".json"), null, String(name));
+    }
 });
