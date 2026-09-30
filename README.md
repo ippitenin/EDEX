@@ -101,6 +101,9 @@ not been attempted.
 
 ## Version history
 
+- **2.4.3** (2026-09-30) — two folders sent from Finder in quick succession each get their own tab.
+  The second used to connect to the first one's shell, fail with an error dialog and leave its own
+  shell running with no tab.
 - **2.4.2** (2026-09-30) — "Open in EDEX" is back in the Finder menu. macOS registers the app but
   not the service agent inside it, so after a reinstall the entry was gone; EDEX now registers the
   agent itself on every launch.

@@ -136,6 +136,8 @@ A dev server on port 3000 used to crash EDEX on launch with `EADDRINUSE`.
       folder
 - [ ] Same with EDEX already running → folder opens in a free tab
 - [ ] With all five tabs occupied → an explanatory dialog, no crash
+- [ ] With EDEX running, send two folders one right after the other → two tabs, each in its own
+      folder, no error dialog and no extra tab in the home directory
 - [ ] Try it on a folder whose name contains a space and an apostrophe
 
 ## Settings and shortcuts
