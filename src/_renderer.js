@@ -6,8 +6,9 @@ window.eval = global.eval = function () {
 const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("./utils/sanitize.js");
 // Window helpers — same story, see utils/system.js
 const {pickNextDisplay} = require("./utils/system.js");
-// Which physical key each slot of the on-screen keyboard stands for, see utils/keyboard.js
-const {codeForKeySlot} = require("./utils/keyboard.js");
+// Which physical key each slot of the on-screen keyboard stands for, what its dead keys do and the
+// control sequences it sends, see utils/keyboard.js
+const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES} = require("./utils/keyboard.js");
 // Shows settings.env as JSON in the settings editor and reads it back, see utils/config.js
 const {formatEnvSetting, parseEnvSetting} = require("./utils/config.js");
 // Fits the working directory into the filesystem panel's title bar and keeps theme and layout
@@ -17,6 +18,9 @@ window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
 window._codeForKeySlot = codeForKeySlot;
+window._applyDeadKey = applyDeadKey;
+window._ctrlseq = CTRLSEQ;
+window._keySequences = KEY_SEQUENCES;
 window._shortenPath = shortenPath;
 window._encodePathURI = uri => {
     return encodeURI(uri).replace(/#/g, "%23");

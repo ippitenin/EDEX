@@ -3,7 +3,8 @@ class Keyboard {
         if (!opts.layout || !opts.container) throw new Error("Keyboard: missing opts.layout or opts.container");
 
         const layout = JSON.parse(require("fs").readFileSync(opts.layout, {encoding: "utf-8"}));
-        this.ctrlseq = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+        // What Ctrl plus a key sends, by the n in a layout's ~~~CTRLSEQn~~~ — see utils/keyboard.js.
+        this.ctrlseq = window._ctrlseq;
         this.container = document.getElementById(opts.container);
 
         this.linkedToTerm = true;
@@ -300,12 +301,12 @@ class Keyboard {
             if (key === null && e.code === "AltLeft") key = document.querySelector('div.keyboard_key[data-cmd="ESCAPED|-- FN: ON"]');
             if (key === null && e.code === "AltRight") key = document.querySelector('div.keyboard_key[data-cmd="ESCAPED|-- ALT: RIGHT"]');
             if (key === null && e.code === "CapsLock") key = document.querySelector('div.keyboard_key[data-cmd="ESCAPED|-- CAPSLCK: ON"]');
-            if (key === null && e.code === "Escape") key = document.querySelector('div.keyboard_key[data-cmd=""]');
-            if (key === null && e.code === "Backspace") key = document.querySelector('div.keyboard_key[data-cmd=""]');
-            if (key === null && e.code === "ArrowUp") key = document.querySelector('div.keyboard_key[data-cmd="OA"]');
-            if (key === null && e.code === "ArrowLeft") key = document.querySelector('div.keyboard_key[data-cmd="OD"]');
-            if (key === null && e.code === "ArrowDown") key = document.querySelector('div.keyboard_key[data-cmd="OB"]');
-            if (key === null && e.code === "ArrowRight") key = document.querySelector('div.keyboard_key[data-cmd="OC"]');
+            if (key === null && e.code === "Escape") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.ESCAPE+'"]');
+            if (key === null && e.code === "Backspace") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.BACKSPACE+'"]');
+            if (key === null && e.code === "ArrowUp") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.ARROW_UP+'"]');
+            if (key === null && e.code === "ArrowLeft") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.ARROW_LEFT+'"]');
+            if (key === null && e.code === "ArrowDown") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.ARROW_DOWN+'"]');
+            if (key === null && e.code === "ArrowRight") key = document.querySelector('div.keyboard_key[data-cmd="'+window._keySequences.ARROW_RIGHT+'"]');
             if (key === null && e.code === "Enter") key = document.querySelectorAll('div.keyboard_key.keyboard_enter');
 
             // Find "rare" keys (ctrl and alt symbols)
@@ -430,55 +431,55 @@ class Keyboard {
         if (this.container.dataset.isAltOn === "true" && this.container.dataset.isShiftOn === "true" && key.dataset.altshift_cmd) cmd = key.dataset.altshift_cmd;
         if (this.container.dataset.isFnOn === "true" && key.dataset.fn_cmd) cmd = key.dataset.fn_cmd;
         if (this.container.dataset.isNextCircum === "true") {
-            cmd = this.addCircum(cmd);
+            cmd = window._applyDeadKey("CIRCUM", cmd);
             this.container.dataset.isNextCircum = "false";
         }
         if (this.container.dataset.isNextTrema === "true") {
-            cmd = this.addTrema(cmd);
+            cmd = window._applyDeadKey("TREMA", cmd);
             this.container.dataset.isNextTrema = "false";
         }
         if (this.container.dataset.isNextAcute === "true") {
-            cmd = this.addAcute(cmd);
+            cmd = window._applyDeadKey("ACUTE", cmd);
             this.container.dataset.isNextAcute = "false";
         }
         if (this.container.dataset.isNextGrave === "true") {
-            cmd = this.addGrave(cmd);
+            cmd = window._applyDeadKey("GRAVE", cmd);
             this.container.dataset.isNextGrave = "false";
         }
         if (this.container.dataset.isNextCaron === "true") {
-            cmd = this.addCaron(cmd);
+            cmd = window._applyDeadKey("CARON", cmd);
             this.container.dataset.isNextCaron = "false";
         }
         if (this.container.dataset.isNextBar === "true") {
-            cmd = this.addBar(cmd);
+            cmd = window._applyDeadKey("BAR", cmd);
             this.container.dataset.isNextBar = "false";
         }
         if (this.container.dataset.isNextBreve === "true") {
-            cmd = this.addBreve(cmd);
+            cmd = window._applyDeadKey("BREVE", cmd);
             this.container.dataset.isNextBreve = "false";
         }
         if (this.container.dataset.isNextTilde === "true") {
-            cmd = this.addTilde(cmd);
+            cmd = window._applyDeadKey("TILDE", cmd);
             this.container.dataset.isNextTilde = "false";
         }
         if (this.container.dataset.isNextMacron === "true") {
-            cmd = this.addMacron(cmd);
+            cmd = window._applyDeadKey("MACRON", cmd);
             this.container.dataset.isNextMacron = "false";
         }
         if (this.container.dataset.isNextCedilla === "true") {
-            cmd = this.addCedilla(cmd);
+            cmd = window._applyDeadKey("CEDILLA", cmd);
             this.container.dataset.isNextCedilla = "true";
         }
         if (this.container.dataset.isNextOverring === "true") {
-            cmd = this.addOverring(cmd);
+            cmd = window._applyDeadKey("OVERRING", cmd);
             this.container.dataset.isNextOverring = "false";
         }
         if (this.container.dataset.isNextGreek === "true") {
-            cmd = this.toGreek(cmd);
+            cmd = window._applyDeadKey("GREEK", cmd);
             this.container.dataset.isNextGreek = "false";
         }
         if (this.container.dataset.isNextIotasub === "true") {
-            cmd = this.addIotasub(cmd);
+            cmd = window._applyDeadKey("IOTASUB", cmd);
             this.container.dataset.isNextIotasub = "false";
         }
 
@@ -557,15 +558,15 @@ class Keyboard {
             let isDelete = false;
             if (typeof document.activeElement.value !== "undefined") {
                 switch(cmd) {
-                    case "":
+                    case window._keySequences.BACKSPACE:
                         document.activeElement.value = document.activeElement.value.slice(0, -1);
                         isDelete = true;
                         break;
-                    case "OD":
+                    case window._keySequences.ARROW_LEFT:
                         document.activeElement.selectionStart--;
                         document.activeElement.selectionEnd = document.activeElement.selectionStart;
                         break;
-                    case "OC":
+                    case window._keySequences.ARROW_RIGHT:
                         document.activeElement.selectionEnd++;
                         document.activeElement.selectionStart = document.activeElement.selectionEnd;
                         break;
@@ -587,727 +588,6 @@ class Keyboard {
         (d === "true") ? d = "false" : d = "true";
         this.container.dataset.passwordMode = d;
         return d;
-    }
-    addCircum(char) {
-        switch(char) {
-            case "a":
-                return "â";
-            case "A":
-                return "Â";
-            case "z":
-                return "ẑ";
-            case "Z":
-                return "Ẑ";
-            case "e":
-                return "ê";
-            case "E":
-                return "Ê";
-            case "y":
-                return "ŷ";
-            case "Y":
-                return "Ŷ";
-            case "u":
-                return "û";
-            case "U":
-                return "Û";
-            case "i":
-                return "î";
-            case "I":
-                return "Î";
-            case "o":
-                return "ô";
-            case "O":
-                return "Ô";
-            case "s":
-                return "ŝ";
-            case "S":
-                return "Ŝ";
-            case "g":
-                return "ĝ";
-            case "G":
-                return "Ĝ";
-            case "h":
-                return "ĥ";
-            case "H":
-                return "Ĥ";
-            case "j":
-                return "ĵ";
-            case "J":
-                return "Ĵ";
-            case "w":
-                return "ŵ";
-            case "W":
-                return "Ŵ";
-            case "c":
-                return "ĉ";
-            case "C":
-                return "Ĉ";
-            // the circumflex can also be used for superscript numbers
-            case "1":
-                return "¹";
-            case "2":
-                return "²";
-            case "3":
-                return "³";
-            case "4":
-                return "⁴";
-            case "5":
-                return "⁵";
-            case "6":
-                return "⁶";
-            case "7":
-                return "⁷";
-            case "8":
-                return "⁸";
-            case "9":
-                return "⁹";
-            case "0":
-                return "⁰";
-            default:
-                return char;
-        }
-    }
-    addTrema(char) {
-        switch(char) {
-            case "a":
-                return "ä";
-            case "A":
-                return "Ä";
-            case "e":
-                return "ë";
-            case "E":
-                return "Ë";
-            case "t":
-                return "ẗ";
-            // My keyboard says no uppercase ẗ
-            case "y":
-                return "ÿ";
-            case "Y":
-                return "Ÿ";
-            case "u":
-                return "ü";
-            case "U":
-                return "Ü";
-            case "i":
-                return "ï";
-            case "I":
-                return "Ï";
-            case "o":
-                return "ö";
-            case "O":
-                return "Ö";
-            case "h":
-                return "ḧ";
-            case "H":
-                return "Ḧ";
-            case "w":
-                return "ẅ";
-            case "W":
-                return "Ẅ";
-            case "x":
-                return "ẍ";
-            case "X":
-                return "Ẍ";
-            default:
-                return char;
-        }
-    }
-    addAcute(char) {
-        switch(char) {
-            case "a":
-                return "á";
-            case "A":
-                return "Á";
-            case "c":
-                return "ć";
-            case "C":
-                return "Ć";
-            case "e":
-                return "é";
-            case "E":
-                return "E";
-            case "g":
-                return "ǵ";
-            case "G":
-                return "Ǵ";
-            case "i":
-                return "í";
-            case "I":
-                return "Í";
-            case "j":
-                return "ȷ́";
-            case "J":
-                return "J́";
-            case "k":
-                return "ḱ";
-            case "K":
-                return "Ḱ";
-            case "l":
-                return "ĺ";
-            case "L":
-                return "Ĺ";
-            case "m":
-                return "ḿ";
-            case "M":
-                return "Ḿ";
-            case "n":
-                return "ń";
-            case "N":
-                return "Ń";
-            case "o":
-                return "ó";
-            case "O":
-                return "Ó";
-            case "p":
-                return "ṕ";
-            case "P":
-                return "Ṕ";
-            case "r":
-                return "ŕ";
-            case "R":
-                return "Ŕ";
-            case "s":
-                return "ś";
-            case "S":
-                return "Ś";
-            case "u":
-                return "ú";
-            case "U":
-                return "Ú";
-            case "v":
-                return "v́";
-            case "V":
-                return "V́";
-            case "w":
-                return "ẃ";
-            case "W":
-                return "Ẃ";
-            case "y":
-                return "ý";
-            case "Y":
-                return "Ý";
-            case "z":
-                return "ź";
-            case "Z":
-                return "Ź";
-            case "ê":
-                return "ế";
-            case "Ê":
-                return "Ế";
-            case "ç":
-                return "ḉ";
-            case "Ç":
-                return "Ḉ";
-            default:
-                return char;
-        }
-    }
-    addGrave(char) {
-        switch (char) {
-            case "a":
-                return "à";
-            case "A":
-                return "À";
-            case "e":
-                return "è";
-            case "E":
-                return "È";
-            case "i":
-                return "ì";
-            case "I":
-                return "Ì";
-            case "m":
-                return "m̀";
-            case "M":
-                return "M̀";
-            case "n":
-                return "ǹ";
-            case "N":
-                return "Ǹ";
-            case "o":
-                return "ò";
-            case "O":
-                return "Ò";
-            case "u":
-                return "ù";
-            case "U":
-                return "Ù";
-            case "v":
-                return "v̀";
-            case "V":
-                return "V̀";
-            case "w":
-                return "ẁ";
-            case "W":
-                return "Ẁ";
-            case "y":
-                return "ỳ";
-            case "Y":
-                return "Ỳ";
-            case "ê":
-                return "ề";
-            case "Ê":
-                return "Ề";
-            default:
-                return char;
-        }
-    }
-    addCaron(char) {
-        switch (char) {
-            case "a":
-                return "ǎ";
-            case "A":
-                return "Ǎ";
-            case "c":
-                return "č";
-            case "C":
-                return "Č";
-            case "d":
-                return "ď";
-            case "D":
-                return "Ď";
-            case "e":
-                return "ě";
-            case "E":
-                return "Ě";
-            case "g":
-                return "ǧ";
-            case "G":
-                return "Ǧ";
-            case "h":
-                return "ȟ";
-            case "H":
-                return "Ȟ";
-            case "i":
-                return "ǐ";
-            case "I":
-                return "Ǐ";
-            case "j":
-                return "ǰ";
-            case "k":
-                return "ǩ";
-            case "K":
-                return "Ǩ";
-            case "l":
-                return "ľ";
-            case "L":
-                return "Ľ";
-            case "n":
-                return "ň";
-            case "N":
-                return "Ň";
-            case "o":
-                return "ǒ";
-            case "O":
-                return "Ǒ";
-            case "r":
-                return "ř";
-            case "R":
-                return "Ř";
-            case "s":
-                return "š";
-            case "S":
-                return "Š";
-            case "t":
-                return "ť";
-            case "T":
-                return "Ť";
-            case "u":
-                return "ǔ";
-            case "U":
-                return "Ǔ";
-            case "z":
-                return "ž";
-            case "Z":
-                return "Ž";
-            // caron can also be used for subscript numbers
-            case "1":
-                return "₁";
-            case "2":
-                return "₂";
-            case "3":
-                return "₃";
-            case "4":
-                return "₄";
-            case "5":
-                return "₅";
-            case "6":
-                return "₆";
-            case "7":
-                return "₇";
-            case "8":
-                return "₈";
-            case "9":
-                return "₉";
-            case "0":
-                return "₀";
-            default:
-                return char;
-        }
-    }
-    addBar(char) {
-        switch (char) {
-            case "a":
-                return "ⱥ";
-            case "A":
-                return "Ⱥ";
-            case "b":
-                return "ƀ";
-            case "B":
-                return "Ƀ";
-            case "c":
-                return "ȼ";
-            case "C":
-                return "Ȼ";
-            case "d":
-                return "đ";
-            case "D":
-                return "Đ";
-            case "e":
-                return "ɇ";
-            case "E":
-                return "Ɇ";
-            case "g":
-                return "ǥ";
-            case "G":
-                return "Ǥ";
-            case "h":
-                return "ħ";
-            case "H":
-                return "Ħ";
-            case "i":
-                return "ɨ";
-            case "I":
-                return "Ɨ";
-            case "j":
-                return "ɉ";
-            case "J":
-                return "Ɉ";
-            case "l":
-                return "ł";
-            case "L":
-                return "Ł";
-            case "o":
-                return "ø";
-            case "O":
-                return "Ø";
-            case "p":
-                return "ᵽ";
-            case "P":
-                return "Ᵽ";
-            case "r":
-                return "ɍ";
-            case "R":
-                return "Ɍ";
-            case "t":
-                return "ŧ";
-            case "T":
-                return "Ŧ";
-            case "u":
-                return "ʉ";
-            case "U":
-                return "Ʉ";
-            case "y":
-                return "ɏ";
-            case "Y":
-                return "Ɏ";
-            case "z":
-                return "ƶ";
-            case "Z":
-                return "Ƶ";
-            default:
-                return char;
-        }
-    }
-    addBreve(char) {
-        switch (char) {
-            case "a":
-                return "ă";
-            case "A":
-                return "Ă";
-            case "e":
-                return "ĕ";
-            case "E":
-                return "Ĕ";
-            case "g":
-                return "ğ";
-            case "G":
-                return "Ğ";
-            case "i":
-                return "ĭ";
-            case "I":
-                return "Ĭ";
-            case "o":
-                return "ŏ";
-            case "O":
-                return "Ŏ";
-            case "u":
-                return "ŭ";
-            case "U":
-                return "Ŭ";
-            case "à":
-                return "ằ";
-            case "À":
-                return "Ằ";
-            default:
-                return char;
-        }
-    }
-    addTilde(char) {
-        switch (char) {
-            case "a":
-                return "ã";
-            case "A":
-                return "Ã";
-            case "e":
-                return "ẽ";
-            case "E":
-                return "Ẽ";
-            case "i":
-                return "ĩ";
-            case "I":
-                return "Ĩ";
-            case "n":
-                return "ñ";
-            case "N":
-                return "Ñ";
-            case "o":
-                return "õ";
-            case "O":
-                return "Õ";
-            case "u":
-                return "ũ";
-            case "U":
-                return "Ũ";
-            case "v":
-                return "ṽ";
-            case "V":
-                return "Ṽ";
-            case "y":
-                return "ỹ";
-            case "Y":
-                return "Ỹ";
-            case "ê":
-                return "ễ";
-            case "Ê":
-                return "Ễ";
-            default:
-                return char;
-        }
-    }
-    addMacron(char) {
-        switch (char) {
-            case "a":
-                return "ā";
-            case "A":
-                return "Ā";
-            case "e":
-                return "ē";
-            case "E":
-                return "Ē";
-            case "g":
-                return "ḡ";
-            case "G":
-                return "Ḡ";
-            case "i":
-                return "ī";
-            case "I":
-                return "Ī";
-            case "o":
-                return "ō";
-            case "O":
-                return "Ō";
-            case "u":
-                return "ū";
-            case "U":
-                return "Ū";
-            case "y":
-                return "ȳ";
-            case "Y":
-                return "Ȳ";
-            case "é":
-                return "ḗ";
-            case "É":
-                return "Ḗ";
-            case "è":
-                return "ḕ";
-            case "È":
-                return "Ḕ";
-            default:
-                return char;
-        }
-    }
-    addCedilla(char) {
-        switch (char) {
-            case "c":
-                return "ç";
-            case "C":
-                return "Ç";
-            case "d":
-                return "ḑ";
-            case "D":
-                return "Ḑ";
-            case "e":
-                return "ȩ";
-            case "E":
-                return "Ȩ";
-            case "g":
-                return "ģ";
-            case "G":
-                return "Ģ";
-            case "h":
-                return "ḩ";
-            case "H":
-                return "Ḩ";
-            case "k":
-                return "ķ";
-            case "K":
-                return "Ķ";
-            case "l":
-                return "ļ";
-            case "L":
-                return "Ļ";
-            case "n":
-                return "ņ";
-            case "N":
-                return "Ņ";
-            case "r":
-                return "ŗ";
-            case "R":
-                return "Ŗ";
-            case "s":
-                return "ş";
-            case "S":
-                return "Ş";
-            case "t":
-                return "ţ";
-            case "T":
-                return "Ţ";
-            default:
-                return char;
-        }
-    }
-    addOverring(char) {
-        switch (char) {
-            case "a":
-                return "å";
-            case "A":
-                return "Å";
-            case "u":
-                return "ů";
-            case "U":
-                return "Ů";
-            case "w":
-                return "ẘ"; // capital w with overring not supported on bépo layout apparently
-            case "y":
-                return "ẙ"; // same for capital y with overring
-            default:
-                return char;
-        }
-    }
-    toGreek(char) {
-        switch (char) {
-            case "b":
-                return "β";
-            case "p":
-                return "π";
-            case "P":
-                return "Π";
-            case "d":
-                return "δ";
-            case "D":
-                return "Δ";
-            case "l":
-                return "λ";
-            case "L":
-                return "Λ";
-            case "j":
-                return "θ";
-            case "J":
-                return "Θ";
-            case "z":
-                return "ζ";
-            case "w":
-                return "ω";
-            case "W":
-                return "Ω";
-            case "A":
-                return "α";
-            case "u":
-                return "υ";
-            case "U":
-                return "Υ";
-            case "i":
-                return "ι";
-            case "e":
-                return "ε";
-            case "t":
-                return "τ";
-            case "s":
-                return "σ";
-            case "S":
-                return "Σ";
-            case "r":
-                return "ρ";
-            case "R":
-                return "Ρ";
-            case "n":
-                return "ν";
-            case "m":
-                return "μ";
-            case "y":
-                return "ψ";
-            case "Y":
-                return "Ψ";
-            case "x":
-                return "ξ";
-            case "X":
-                return "Ξ";
-            case "k":
-                return "κ";
-            case "q":
-                return "χ";
-            case "Q":
-                return "Χ";
-            case "g":
-                return "γ";
-            case "G":
-                return "Γ";
-            case "h":
-                return "η";
-            case "f":
-                return "φ";
-            case "F":
-                return "Φ";
-            default:
-                return char;
-        }
-    }
-    addIotasub(char) {
-        switch (char) {
-            case "o":
-                return "ǫ";
-            case "O":
-                return "Ǫ";
-            case "a":
-                return "ą";
-            case "A":
-                return "Ą";
-            case "u":
-                return "ų";
-            case "U":
-                return "Ų";
-            case "i":
-                return "į";
-            case "I":
-                return "Į";
-            case "e":
-                return "ę";
-            case "E":
-                return "Ę";
-            default:
-                return char;
-        }
     }
 }
 
