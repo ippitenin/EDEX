@@ -68,6 +68,9 @@ not been attempted.
   registered under the theme font's own name and fills the gap in every theme.
 - **The on-screen keyboard lights up by physical key.** It used to match the character typed, so
   under a Russian input source the letters stayed dark.
+- **A long path stays inside the filesystem panel.** It used to run out of the title bar and
+  across the keyboard; now it takes the whole bar when it needs to and, past that, drops folders
+  from the middle — `/Users/me/…/src/utils`.
 - RAM watcher no longer errors out on macOS memory accounting.
 
 ### Added
