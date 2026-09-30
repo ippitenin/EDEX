@@ -3,12 +3,16 @@ window.eval = global.eval = function () {
     throw new Error("eval() is disabled for security reasons.");
 };
 // Security helpers — implementations and their tests live in utils/sanitize.js
-const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("./utils/sanitize.js");
+const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste, encodePathURI} = require("./utils/sanitize.js");
 // Window helpers — same story, see utils/system.js
 const {pickNextDisplay} = require("./utils/system.js");
 // Which physical key each slot of the on-screen keyboard stands for, what its dead keys do and the
 // control sequences it sends, see utils/keyboard.js
-const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES} = require("./utils/keyboard.js");
+const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES, parseShortcutTrigger} = require("./utils/keyboard.js");
+// Numbers into the text the panels show, and the process list they share, see utils/format.js
+// and utils/processes.js
+const {pad, splitDuration, formatRuntime, formatMediaTime, formatBytes} = require("./utils/format.js");
+const {mergeThreadsByName, compareByLoad} = require("./utils/processes.js");
 // Shows settings.env as JSON in the settings editor and reads it back, see utils/config.js
 const {formatEnvSetting, parseEnvSetting} = require("./utils/config.js");
 // Fits the working directory into the filesystem panel's title bar and keeps theme and layout
@@ -21,10 +25,16 @@ window._codeForKeySlot = codeForKeySlot;
 window._applyDeadKey = applyDeadKey;
 window._ctrlseq = CTRLSEQ;
 window._keySequences = KEY_SEQUENCES;
+window._parseShortcutTrigger = parseShortcutTrigger;
+window._pad = pad;
+window._splitDuration = splitDuration;
+window._formatRuntime = formatRuntime;
+window._formatMediaTime = formatMediaTime;
+window._formatBytes = formatBytes;
+window._mergeThreadsByName = mergeThreadsByName;
+window._compareByLoad = compareByLoad;
 window._shortenPath = shortenPath;
-window._encodePathURI = uri => {
-    return encodeURI(uri).replace(/#/g, "%23");
-};
+window._encodePathURI = encodePathURI;
 window._delay = ms => {
     return new Promise((resolve, reject) => {
         setTimeout(resolve, ms);
@@ -411,6 +421,10 @@ async function initUI() {
 
     // Initialize modules
     window.mods = {};
+
+    // Modules add their markup with insertAdjacentHTML. Six of them used innerHTML +=, which rebuilt
+    // everything already in the column; only this order and the delays before the globe and the
+    // charts draw kept earlier modules' live elements from being thrown away.
 
     // Left column
     window.mods.clock = new Clock("mod_column_left");

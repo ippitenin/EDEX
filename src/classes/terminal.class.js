@@ -15,14 +15,8 @@ class Terminal {
             this.oncwdchange = () => {};
 
             this._sendSizeToServer = () => {
-                let cols = this.term.cols.toString();
-                let rows = this.term.rows.toString();
-                while (cols.length < 3) {
-                    cols = "0"+cols;
-                }
-                while (rows.length < 3) {
-                    rows = "0"+rows;
-                }
+                let cols = window._pad(this.term.cols, 3);
+                let rows = window._pad(this.term.rows, 3);
                 this.Ipc.send("terminal_channel-"+this.port, "Resize", cols, rows);
             };
 

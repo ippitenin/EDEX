@@ -4,8 +4,8 @@ class Cpuinfo {
 
         // Create initial DOM
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_cpuinfo">
-        </div>`;
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_cpuinfo">
+        </div>`);
         this.container = document.getElementById("mod_cpuinfo");
 
         // Init Smoothie

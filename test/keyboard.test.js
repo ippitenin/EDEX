@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
-const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES} = require("../src/utils/keyboard.js");
+const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES, parseShortcutTrigger} = require("../src/utils/keyboard.js");
 
 // What keyboard.class.js returned before its dead-key switches became tables in utils.
 const legacy = require("./fixtures/keyboard-legacy.json");
@@ -148,4 +148,17 @@ test("every ~~~CTRLSEQn~~~ in the bundled layouts has a sequence", () => {
             assert.ok(Number(n) >= 1 && Number(n) < CTRLSEQ.length, `${name}: CTRLSEQ${n}`);
         }
     }
+});
+
+test("a shortcut trigger is filed under its modifiers in Ctrl, Alt, Shift order", () => {
+    assert.deepStrictEqual(parseShortcutTrigger("Ctrl+Shift+F"), {category: "CtrlShift", key: "F"});
+    assert.deepStrictEqual(parseShortcutTrigger("Shift+Ctrl+F"), {category: "CtrlShift", key: "F"});
+    assert.deepStrictEqual(parseShortcutTrigger("Shift+Alt+Ctrl+Space"), {category: "CtrlAltShift", key: "Space"});
+    assert.deepStrictEqual(parseShortcutTrigger("Ctrl+X"), {category: "Ctrl", key: "X"});
+});
+
+test("a trigger the keyboard cannot handle comes out as a combination it does not know", () => {
+    // The keyboard skips these instead of building a category for them.
+    assert.deepStrictEqual(parseShortcutTrigger("F5"), {category: "", key: "F5"});
+    assert.deepStrictEqual(parseShortcutTrigger("Cmd+Shift+K"), {category: "CmdShift", key: "K"});
 });

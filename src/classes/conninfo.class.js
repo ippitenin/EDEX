@@ -4,7 +4,7 @@ class Conninfo {
 
         // Create DOM
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_conninfo">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_conninfo">
             <div id="mod_conninfo_innercontainer">
                 <h1>NETWORK TRAFFIC<i>UP / DOWN, MB/S</i></h1>
                 <h2>TOTAL<i>0B OUT, 0B IN</i></h2>
@@ -12,7 +12,7 @@ class Conninfo {
                 <canvas id="mod_conninfo_canvas_bottom"></canvas>
                 <h3>OFFLINE</h3>
             </div>
-        </div>`;
+        </div>`);
 
         this.current = document.querySelector("#mod_conninfo_innercontainer > h1 > i");
         this.total = document.querySelector("#mod_conninfo_innercontainer > h2 > i");

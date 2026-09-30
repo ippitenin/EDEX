@@ -36,15 +36,8 @@ class Keyboard {
         };
         window.shortcuts.forEach(scut => {
             let cut = Object.assign({}, scut);
-            let mods = cut.trigger.split("+");
-            cut.trigger = mods.pop();
-
-            let order = ["Ctrl", "Alt", "Shift"];
-            mods.sort((a, b) => {
-                return order.indexOf(a) - order.indexOf(b);
-            });
-
-            let cat = mods.join("");
+            const {category: cat, key} = window._parseShortcutTrigger(cut.trigger);
+            cut.trigger = key;
             // Only combinations of Ctrl, Alt and Shift exist. Anything else in shortcuts.json — a
             // bare key, "Cmd+K", a typo — used to throw here and take the whole keyboard with it.
             if (!Object.prototype.hasOwnProperty.call(this._shortcuts, cat)) {

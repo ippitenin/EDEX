@@ -25,22 +25,10 @@ class Toplist {
         this.currentlyUpdating = true;
         window.si.processes().then(data => {
             if (window.settings.excludeThreadsFromToplist === true) {
-                data.list = data.list.sort((a, b) => {
-                    return (a.pid-b.pid);
-                }).filter((e, index, a) => {
-                    let i = a.findIndex(x => x.name === e.name);
-                    if (i !== -1 && i !== index) {
-                        a[i].cpu = a[i].cpu+e.cpu;
-                        a[i].mem = a[i].mem+e.mem;
-                        return false;
-                    }
-                    return true;
-                });
+                data.list = window._mergeThreadsByName(data.list);
             }
 
-            let list = data.list.sort((a, b) => {
-                return ((b.cpu-a.cpu)*100 + b.mem-a.mem);
-            }).splice(0, 5);
+            let list = data.list.sort(window._compareByLoad).splice(0, 5);
 
             document.querySelectorAll("#mod_toplist_table > tr").forEach(el => {
                 el.remove();
@@ -82,40 +70,12 @@ class Toplist {
             }
         }
 
-        function formatRuntime(ms){
-            const msInDay = 24 * 60 * 60 * 1000;
-            let days = Math.floor(ms / msInDay);
-            let remainingMS = ms % msInDay;
-
-            const msInHour = 60 * 60 * 1000;
-            let hours = Math.floor(remainingMS / msInHour);
-            remainingMS = ms % msInHour;
-
-            let msInMin = 60 * 1000;
-            let minutes = Math.floor(remainingMS / msInMin);
-            remainingMS = ms % msInMin;
-
-            let seconds = Math.floor(remainingMS / 1000);
-
-            return `${days < 10 ? "0" : ""}${days}:${hours < 10 ? "0" : ""}${hours}:${minutes < 10 ? "0" : ""}${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-        }
-
         function updateProcessList() {
             if (currentlyUpdating) return;
             currentlyUpdating = true;
             window.si.processes().then(data => {
                 if (window.settings.excludeThreadsFromToplist === true) {
-                    data.list = data.list.sort((a, b) => {
-                        return (a.pid - b.pid);
-                    }).filter((e, index, a) => {
-                        let i = a.findIndex(x => x.name === e.name);
-                        if (i !== -1 && i !== index) {
-                            a[i].cpu = a[i].cpu + e.cpu;
-                            a[i].mem = a[i].mem + e.mem;
-                            return false;
-                        }
-                        return true;
-                    });
+                    data.list = window._mergeThreadsByName(data.list);
                 }
 
                 data.list.forEach(proc => {
@@ -168,7 +128,7 @@ class Toplist {
                             else return b.runtime - a.runtime;
                         default:
                             // default to the same sorting as the toplist
-                            return ((b.cpu - a.cpu) * 100 + b.mem - a.mem);
+                            return window._compareByLoad(a, b);
                     }
                 });
 
@@ -187,7 +147,7 @@ class Toplist {
                             <td class="mem">${Math.round(proc.mem * 10) / 10}%</td>
                             <td class="state">${window._escapeHtml(proc.state)}</td>
                             <td class="started">${window._escapeHtml(proc.started)}</td>
-                            <td class="runtime">${formatRuntime(proc.runtime)}</td>`;
+                            <td class="runtime">${window._formatRuntime(proc.runtime)}</td>`;
                         document.getElementById("processList").append(el);
                     });
                 }

@@ -160,4 +160,18 @@ const KEY_SEQUENCES = Object.freeze({
     ARROW_RIGHT: "\x1bOC"
 });
 
-module.exports = {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES};
+/**
+ * Splits a shortcut trigger such as "Shift+Ctrl+F" into its key and the modifier combination the
+ * on-screen keyboard files it under — "CtrlShift": Ctrl, Alt and Shift in that order, whatever
+ * order the trigger names them in. Anything else stays in the combination as written, which is
+ * how the keyboard recognises a trigger it cannot handle.
+ */
+function parseShortcutTrigger(trigger) {
+    const mods = trigger.split("+");
+    const key = mods.pop();
+    const order = ["Ctrl", "Alt", "Shift"];
+    mods.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return {category: mods.join(""), key};
+}
+
+module.exports = {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES, parseShortcutTrigger};

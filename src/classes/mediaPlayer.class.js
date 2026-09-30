@@ -92,17 +92,6 @@ class MediaPlayer {
             mediaControls.classList.remove("fullscreen_hidden");
         };
 
-        this.mediaTimeToHMS = (time) => {
-            let seconds = parseInt(time)
-            const hours = parseInt(seconds / 3600);
-            seconds = seconds % 3600;
-            const minutes = parseInt(seconds / 60);
-            seconds = seconds % 60;
-            return (hours < 10 ? "0" : "") + hours + ":" +
-                (minutes < 10 ? "0" : "") + minutes + ":" +
-                (seconds < 10 ? "0" : "") + seconds;
-        };
-
         this.updateVolume = (x) => {
             let vol = (x - (volumeBar.offsetLeft + volumeBar.offsetParent.offsetLeft)) / volumeBar.clientWidth;
             if (vol > 1) {
@@ -130,7 +119,7 @@ class MediaPlayer {
         media.addEventListener("pause", () => { this.changeButtonState("playpause") }, false);
         media.addEventListener("timeupdate", () => {
             progressBar.style.width = Math.floor((media.currentTime / media.duration) * 100) + "%";
-            mediaTime.textContent = this.mediaTimeToHMS(media.currentTime);
+            mediaTime.textContent = window._formatMediaTime(media.currentTime);
         });
 
         volume.addEventListener("mousedown", (e) => {

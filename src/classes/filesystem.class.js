@@ -7,7 +7,6 @@ class FilesystemDisplay {
         this.cwd = [];
         this.cwd_path = null;
         this.iconcolor = `rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b})`;
-        this._formatBytes = (a,b) => {if(0==a)return"0 Bytes";var c=1024,d=b||2,e=["Bytes","KB","MB","GB","TB","PB","EB","ZB","YB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(d))+" "+e[f]};
         this.fileIconsMatcher = require("./assets/misc/file-icons-match.js");
         this.icons = require("./assets/icons/file-icons.json");
         this.edexIcons = {
@@ -109,25 +108,6 @@ class FilesystemDisplay {
                 this.readFS(this.dirpath);
             }
         }, 1000);
-
-        this._asyncFSwrapper = new Proxy(fs, {
-            get: function(fs, prop) {
-                if (prop in fs) {
-                    return function(...args) {
-                        return new Promise((resolve, reject) => {
-                            fs[prop](...args, (err, d) => {
-                                if (typeof err !== "undefined" && err !== null) reject(err);
-                                if (typeof d !== "undefined") resolve(d);
-                                if (typeof d === "undefined" && typeof err === "undefined") resolve();
-                            });
-                        });
-                    }
-                }
-            },
-            set: function() {
-                return false;
-            }
-        });
 
         this.followTab = () => {
             // Don't follow tabs when running in detached mode, see #432
@@ -236,7 +216,7 @@ class FilesystemDisplay {
             let tcwd = dir;
             let content;
             try {
-                content = await this._asyncFSwrapper.readdir(tcwd);
+                content = await fs.promises.readdir(tcwd);
             } catch (err) {
                 console.warn(err);
                 // In place of the listing, so the panel recovers as soon as the shell moves on.
@@ -260,7 +240,7 @@ class FilesystemDisplay {
             await Promise.all(content.map(async file => {
                 let fstat;
                 try {
-                    fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file));
+                    fstat = await fs.promises.lstat(path.join(tcwd, file));
                 } catch (err) {
                     // Deleted between readdir and lstat — a swap file, a lock file, npm at work.
                     // That used to put the whole panel into its failed state for good.
@@ -534,7 +514,7 @@ class FilesystemDisplay {
                 }
 
                 if (typeof e.size === "number") {
-                    e.size = this._formatBytes(e.size);
+                    e.size = window._formatBytes(e.size);
                 } else {
                     e.size = "--";
                 }

@@ -69,4 +69,13 @@ function escapePathForPaste(value) {
     return value.replace(/[^A-Za-z0-9_\-.,:+@%/\u0080-\uffff]/g, "\\$&");
 }
 
-module.exports = {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste};
+/**
+ * Turns a file path into something a src="…" or a URL-taking API loads as that file. encodeURI
+ * leaves # alone, and the rest of the path after one would be read as a fragment — a PDF or a song
+ * in a folder called "C#" did not load.
+ */
+function encodePathURI(value) {
+    return encodeURI(value).replace(/#/g, "%23");
+}
+
+module.exports = {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste, encodePathURI};

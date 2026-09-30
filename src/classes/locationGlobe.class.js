@@ -10,14 +10,14 @@ class LocationGlobe {
 
         // Create DOM and include lib
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_globe">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_globe">
             <div id="mod_globe_innercontainer">
                 <h1>WORLD VIEW<i>GLOBAL NETWORK MAP</i></h1>
                 <h2>ENDPOINT LAT/LON<i class="mod_globe_headerInfo">0.0000, 0.0000</i></h2>
                 <div id="mod_globe_canvas_placeholder"></div>
                 <h3>OFFLINE</h3>
             </div>
-        </div>`;
+        </div>`);
 
         this.lastgeo = {};
         this.conns = [];

@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const {execFileSync} = require("node:child_process");
-const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("../src/utils/sanitize.js");
+const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste, encodePathURI} = require("../src/utils/sanitize.js");
 
 test("escapeHtml neutralises tags", () => {
     assert.strictEqual(
@@ -149,4 +149,17 @@ test("escapePathForPaste coerces non-strings instead of throwing", () => {
     assert.strictEqual(escapePathForPaste(undefined), "");
     assert.strictEqual(escapePathForPaste(null), "");
     assert.strictEqual(escapePathForPaste(42), "42");
+});
+
+test("encodePathURI keeps a # in a path from starting a fragment", () => {
+    assert.strictEqual(encodePathURI("/Users/me/C#/song.mp3"), "/Users/me/C%23/song.mp3");
+    const url = new URL("file://" + encodePathURI("/Users/me/C#/song.mp3"));
+    assert.strictEqual(url.hash, "");
+    assert.strictEqual(decodeURIComponent(url.pathname), "/Users/me/C#/song.mp3");
+});
+
+test("encodePathURI encodes spaces, quotes and non-ASCII names and leaves the slashes", () => {
+    assert.strictEqual(encodePathURI("/My Files/\"q\".pdf"), "/My%20Files/%22q%22.pdf");
+    assert.strictEqual(encodePathURI("/Документы/отчёт.pdf"), encodeURI("/Документы/отчёт.pdf"));
+    assert.strictEqual(encodePathURI("/a%b"), "/a%25b");
 });
