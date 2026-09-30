@@ -62,6 +62,9 @@ not been attempted.
 - **Quiet by default:** no sound on keystrokes, terminal output, modals or directory
   refreshes. Enter keeps its confirmation sound, and the boot theme still plays.
 - The glitch title screen is skipped — the boot log hands straight over to the UI.
+- **The startup animation lands where it started.** The terminal frame used to unfold, blink and
+  jump to a different spot, and the keyboard spread across the whole screen before snapping into
+  its corner. Both now open in place.
 - `LANG` defaults to `ru_RU.UTF-8` when unset; without it Cyrillic input came out as digits.
 - **Cyrillic in the interface font.** United Sans has none, so Russian file names were drawn in
   the system fallback — wider and heavier than the Latin next to them. Play's Cyrillic is now

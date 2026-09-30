@@ -377,35 +377,38 @@ async function getDisplayName() {
 
 // Create the UI's html structure and initialize the terminal client and the keyboard
 async function initUI() {
+    // The terminal frame unfolds from a line into a box, and it has to do so in the spot where
+    // it will stay. It used to unfold alone on the page, propped up by a bottom margin standing
+    // in for the row below; when the filesystem panel and the keyboard were then added, the
+    // layout settled differently and the frame jumped — 24px up and a few sideways, behind a
+    // blink that was meant to hide it.
+    //
+    // Now the bottom row is in the page from the first frame, invisible, so nothing is added
+    // later and nothing reflows. While folded, the frame carries vertical margins of half its
+    // final height (60.3%, see main_shell.css) that shrink as it grows: the space it occupies
+    // stays constant, and it opens evenly from its middle. The margins at the sides are there
+    // for the line break: flex wrapping is greedy, and a frame that is still narrow would share
+    // its line with the filesystem panel and sit off-centre until it grew too wide for that.
+    // None of it survives into the final state, so the resting position does not depend on
+    // these numbers being exact.
+    const shellFolded = "height:0%;margin:30.15vh 30%;";
+
     document.body.innerHTML += `<section class="mod_column" id="mod_column_left">
         <h3 class="title"><p>PANEL</p><p>SYSTEM</p></h3>
     </section>
-    <section id="main_shell" style="height:0%;width:0%;opacity:0;margin-bottom:30vh;" augmented-ui="bl-clip tr-clip exe">
+    <section id="main_shell" style="${shellFolded}width:0%;opacity:0;" augmented-ui="bl-clip tr-clip exe">
         <h3 class="title" style="opacity:0;"><p>TERMINAL</p><p>MAIN SHELL</p></h3>
         <h1 id="main_shell_greeting"></h1>
     </section>
     <section class="mod_column" id="mod_column_right">
         <h3 class="title"><p>PANEL</p><p>NETWORK</p></h3>
-    </section>`;
-
-    await _delay(10);
-
-    window.audioManager.expand.play();
-    document.getElementById("main_shell").setAttribute("style", "height:0%;margin-bottom:30vh;");
-
-    await _delay(500);
-
-    document.getElementById("main_shell").setAttribute("style", "margin-bottom: 30vh;");
-    document.querySelector("#main_shell > h3.title").setAttribute("style", "");
-
-    await _delay(700);
-
-    document.getElementById("main_shell").setAttribute("style", "opacity: 0;");
-    document.body.innerHTML += `
-    <section id="filesystem" style="width: 0px;" class="${window.settings.hideDotfiles ? "hideDotfiles" : ""} ${window.settings.fsListView ? "list-view" : ""}">
+    </section>
+    <section id="filesystem" class="${window.settings.hideDotfiles ? "hideDotfiles" : ""} ${window.settings.fsListView ? "list-view" : ""}">
     </section>
     <section id="keyboard" style="opacity:0;">
     </section>`;
+    // Built now rather than when it is revealed: the bottom row needs its real height from the
+    // first frame, or the frame above would move when the keys arrive.
     window.keyboard = new Keyboard({
         layout: path.join(keyboardsDir, settings.keyboard+".json"),
         container: "keyboard"
@@ -413,9 +416,16 @@ async function initUI() {
 
     await _delay(10);
 
-    document.getElementById("main_shell").setAttribute("style", "");
+    window.audioManager.expand.play();
+    document.getElementById("main_shell").setAttribute("style", shellFolded);
 
-    await _delay(270);
+    await _delay(500);
+
+    document.getElementById("main_shell").setAttribute("style", "");
+    document.querySelector("#main_shell > h3.title").setAttribute("style", "");
+
+    // The frame is in place; hold it for a moment before the greeting and the keyboard.
+    await _delay(980);
 
     let greeter = document.getElementById("main_shell_greeting");
 
@@ -429,7 +439,6 @@ async function initUI() {
 
     greeter.setAttribute("style", "opacity: 1;");
 
-    document.getElementById("filesystem").setAttribute("style", "");
     document.getElementById("keyboard").setAttribute("style", "");
     document.getElementById("keyboard").setAttribute("class", "animation_state_1");
     window.audioManager.keyboard.play();

@@ -24,32 +24,40 @@ div.keyboard_row {
     height: 5.28vh;
 }
 
+/* Startup reveal. Each row opens like a curtain from its middle, staggered, and ends on a flash.
+
+   It is the clip that animates, not the width. Upstream grew the rows from 0 to 100vw, which
+   worked while the keys sat centred in a row; now that they are spread across it, they
+   travelled out over the whole screen and snapped back into place when the class came off.
+   Clipped, the keys stand where they will stay from the first frame, and dropping the classes
+   at the end changes nothing on screen.
+
+   The insets are negative on purpose where the row is open: Enter and the outer keys reach a
+   little past the row's box and must not be shaved off while the classes are on. */
 section#keyboard.animation_state_2 > div.keyboard_row:nth-child(1) {
-    transition: width .7s cubic-bezier(0.4, 0, 1, 1) .3s, filter .1s linear .8s;
+    transition: clip-path .7s cubic-bezier(0.4, 0, 1, 1) .3s, filter .1s linear .8s;
 }
 section#keyboard.animation_state_2 > div.keyboard_row:nth-child(2) {
-    transition: width .7s cubic-bezier(0.4, 0, 1, 1) .2s, filter .1s linear .6s;
+    transition: clip-path .7s cubic-bezier(0.4, 0, 1, 1) .2s, filter .1s linear .6s;
 }
 section#keyboard.animation_state_2 > div.keyboard_row:nth-child(3) {
-    transition: width .7s cubic-bezier(0.4, 0, 1, 1), filter .1s linear .5s;
+    transition: clip-path .7s cubic-bezier(0.4, 0, 1, 1), filter .1s linear .5s;
 }
 section#keyboard.animation_state_2 > div.keyboard_row:nth-child(4) {
-    transition: width .7s cubic-bezier(0.4, 0, 1, 1) .25s, filter .1s linear .8s;
+    transition: clip-path .7s cubic-bezier(0.4, 0, 1, 1) .25s, filter .1s linear .8s;
 }
 section#keyboard.animation_state_2 > div.keyboard_row:nth-child(5) {
-    transition: width .6s cubic-bezier(0.4, 0, 1, 1) .2s, filter .1s linear .6s;
+    transition: clip-path .6s cubic-bezier(0.4, 0, 1, 1) .2s, filter .1s linear .6s;
 }
 
 section#keyboard.animation_state_1 > * {
     filter: brightness(170%);
-    width: 0vh;
-    overflow: hidden;
+    clip-path: inset(-50% 50%);
 }
 
 section#keyboard.animation_state_2 > * {
     filter: brightness(100%);
-    width: 100vw;
-    overflow: hidden;
+    clip-path: inset(-50% -5%);
 }
 
 div.keyboard_row:last-child {
