@@ -351,14 +351,14 @@ async function loadSettings() {
     return settings;
 }
 
-async function spawnExtraTty(e, arg, settings, env) {
+// Resolves to the reply the renderer reads: "SUCCESS: <port>" or "ERROR: <reason>".
+async function spawnExtraTty(arg, settings, env) {
     // Slots are keyed by the port they would ideally get, and reserved before the await below
     // so two tabs opened at once cannot claim the same one.
     const slot = firstFreeSlot(extraTtys);
     if (slot === null) {
         signale.error("TTY spawn denied (Reason: exceeded max TTYs number)");
-        e.sender.send("ttyspawn-reply", "ERROR: max number of ttys reached");
-        return;
+        return "ERROR: max number of ttys reached";
     }
     extraTtys[slot] = RESERVED;
 
@@ -369,15 +369,14 @@ async function spawnExtraTty(e, arg, settings, env) {
     } catch (err) {
         signale.error(`TTY slot ${slot} found no port to listen on:`, err.message);
         extraTtys[slot] = null;
-        e.sender.send("ttyspawn-reply", "ERROR: "+err.message);
-        return;
+        return "ERROR: "+err.message;
     }
 
     // The app started quitting while the port was being looked for, and before-quit has already
     // closed every shell it knew of. One started now would outlive the app.
     if (quitting) {
         extraTtys[slot] = null;
-        return;
+        return "ERROR: EDEX is quitting";
     }
 
     let term;
@@ -388,8 +387,7 @@ async function spawnExtraTty(e, arg, settings, env) {
         // Without this the slot stayed reserved for good and the tab sat on LOADING forever.
         signale.error(`TTY ${port} could not start:`, err.message);
         extraTtys[slot] = null;
-        e.sender.send("ttyspawn-reply", "ERROR: "+err.message);
-        return;
+        return "ERROR: "+err.message;
     }
     signale.success(`New terminal back-end initialized at ${port}`);
 
@@ -418,24 +416,20 @@ async function spawnExtraTty(e, arg, settings, env) {
 
     // Answer only once the socket is actually accepting connections. Replying straight
     // after the constructor raced the bind: the renderer connected to a port nobody was
-    // listening on yet, and the refusal surfaced as an unexplained error dialog.
-    let replied = false;
-    const reply = message => {
-        if (replied) return;
-        replied = true;
-        e.sender.send("ttyspawn-reply", message);
-    };
+    // listening on yet, and the refusal surfaced as an unexplained error dialog. A promise
+    // settles once, so an error after the socket came up changes nothing already answered.
+    return new Promise(resolve => {
+        if (term.wss.address()) {
+            resolve("SUCCESS: "+port);
+        } else {
+            term.wss.once("listening", () => resolve("SUCCESS: "+port));
+        }
 
-    if (term.wss.address()) {
-        reply("SUCCESS: "+port);
-    } else {
-        term.wss.once("listening", () => reply("SUCCESS: "+port));
-    }
-
-    term.wss.once("error", err => {
-        signale.error(`TTY ${port} could not open its socket:`, err.message);
-        end();
-        reply("ERROR: "+err.message);
+        term.wss.once("error", err => {
+            signale.error(`TTY ${port} could not open its socket:`, err.message);
+            end();
+            resolve("ERROR: "+err.message);
+        });
     });
 }
 
@@ -461,7 +455,11 @@ function registerIpc(settings, env) {
     for (let i = 0; i < 4; i++) {
         extraTtys[basePort+i] = null;
     }
-    ipc.on("ttyspawn", (e, arg) => spawnExtraTty(e, arg, settings, env));
+    // invoke/handle rather than send and a shared "ttyspawn-reply": each answer goes back to the
+    // request that asked for it. With two tabs opening at once — two folders sent from Finder in
+    // quick succession — the first reply reached both waiting tabs, the second tab connected to
+    // the first one's port and was refused, and its own shell ran on with no tab attached.
+    ipc.handle("ttyspawn", (e, arg) => spawnExtraTty(arg, settings, env));
 
     // Backend support for theme and keyboard hotswitch
     let themeOverride = null;

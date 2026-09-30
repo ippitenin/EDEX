@@ -584,8 +584,8 @@ window.focusShellTab = (number, spawnDir) => {
         window.term[number] = null;
 
         document.getElementById("shell_tab"+number).innerHTML = "<p>LOADING...</p>";
-        ipc.send("ttyspawn", spawnDir || "true");
-        ipc.once("ttyspawn-reply", (e, r) => {
+        // A handler that throws rejects the invoke; that is a failed tab like any other.
+        ipc.invoke("ttyspawn", spawnDir || "true").catch(err => "ERROR: "+err.message).then(r => {
             if (r.startsWith("ERROR")) {
                 // Release the slot, otherwise the tab stays wedged on ERROR forever: the guard
                 // above only opens a tab whose entry is undefined, and this one would stay null.
