@@ -7,7 +7,10 @@ const {
     isAllowedOrigin,
     parseProcessName,
     parseCwdOutput,
-    pickNextDisplay
+    pickNextDisplay,
+    pickStartDisplay,
+    resolveSpawnCwd,
+    firstFreeSlot
 } = require("../src/utils/system.js");
 
 // A stand-in filesystem: only the listed paths exist, and only as directories.
@@ -113,4 +116,59 @@ test("pickNextDisplay gives up when the current display is gone", () => {
     // A monitor unplugged between the lookup and the call leaves an id that no longer matches.
     assert.strictEqual(pickNextDisplay(displays, 42), null);
     assert.strictEqual(pickNextDisplay(undefined, 1), null);
+});
+
+const primary = {id: 1};
+const attached = [{id: 2}, primary, {id: 3}];
+
+test("pickStartDisplay opens on the monitor the settings name", () => {
+    assert.strictEqual(pickStartDisplay(attached, primary, 2), attached[2]);
+    // People edit settings.json by hand, and a quoted index has always worked.
+    assert.strictEqual(pickStartDisplay(attached, primary, "2"), attached[2]);
+});
+
+test("pickStartDisplay treats 0 as the first display, not as the primary one", () => {
+    assert.strictEqual(pickStartDisplay(attached, primary, 0), attached[0]);
+});
+
+test("pickStartDisplay falls back to the primary display", () => {
+    // Unset, junk, or a monitor that has been unplugged since.
+    for (const monitor of [undefined, null, NaN, "abc", -1, 5]) {
+        assert.strictEqual(pickStartDisplay(attached, primary, monitor), primary, String(monitor));
+    }
+});
+
+// Only the listed paths exist.
+function existing(paths) {
+    return {existsSync: target => paths.includes(target)};
+}
+
+test("resolveSpawnCwd opens a tab where it was asked to", () => {
+    assert.strictEqual(resolveSpawnCwd("/Users/me/Projects", "/Users/me", "/start", existing(["/Users/me/Projects"])), "/Users/me/Projects");
+});
+
+test("resolveSpawnCwd follows the main shell when no directory is asked for", () => {
+    // The renderer sends the string "true" for a plain new tab.
+    for (const requested of ["true", undefined, true, ""]) {
+        assert.strictEqual(resolveSpawnCwd(requested, "/Users/me", "/start", existing(["true"])), "/Users/me", String(requested));
+    }
+});
+
+test("resolveSpawnCwd falls back when the directory has gone", () => {
+    assert.strictEqual(resolveSpawnCwd("/Users/me/gone", "/Users/me", "/start", existing([])), "/Users/me");
+});
+
+test("resolveSpawnCwd uses the start directory before the main shell has reported one", () => {
+    assert.strictEqual(resolveSpawnCwd("true", undefined, "/start", existing([])), "/start");
+});
+
+test("firstFreeSlot takes the lowest free port", () => {
+    assert.strictEqual(firstFreeSlot({3002: null, 3003: null}), "3002");
+    assert.strictEqual(firstFreeSlot({3002: {}, 3003: null, 3004: null}), "3003");
+});
+
+test("firstFreeSlot reports when every slot is taken", () => {
+    assert.strictEqual(firstFreeSlot({3002: {}, 3003: {}}), null);
+    assert.strictEqual(firstFreeSlot({}), null);
+    assert.strictEqual(firstFreeSlot(null), null);
 });

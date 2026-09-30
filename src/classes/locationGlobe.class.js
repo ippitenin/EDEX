@@ -10,14 +10,14 @@ class LocationGlobe {
 
         // Create DOM and include lib
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_globe">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_globe">
             <div id="mod_globe_innercontainer">
                 <h1>WORLD VIEW<i>GLOBAL NETWORK MAP</i></h1>
                 <h2>ENDPOINT LAT/LON<i class="mod_globe_headerInfo">0.0000, 0.0000</i></h2>
                 <div id="mod_globe_canvas_placeholder"></div>
                 <h3>OFFLINE</h3>
             </div>
-        </div>`;
+        </div>`);
 
         this.lastgeo = {};
         this.conns = [];
@@ -106,8 +106,8 @@ class LocationGlobe {
 
             // Add random satellites
             let constellation = [];
-            for(var i = 0; i< 2; i++){
-                for(var j = 0; j< 3; j++){
+            for (let i = 0; i < 2; i++) {
+                for (let j = 0; j < 3; j++) {
                     constellation.push({
                         lat: 50 * i - 30 + 15 * Math.random(),
                         lon: 120 * j - 120 + 30 * i,
@@ -133,12 +133,6 @@ class LocationGlobe {
         }, 4000);
     }
 
-    addRandomConnectedMarkers() {
-        const randomLat = this.getRandomInRange(40, 90, 3);
-        const randomLong = this.getRandomInRange(-180, 0, 3);
-        this.globe.addMarker(randomLat, randomLong, '');
-        this.globe.addMarker(randomLat - 20, randomLong + 150, '', true);
-    }
     addTemporaryConnectedMarker(ip) {
         let data = window.mods.netstat.geoLookup.get(ip);
         let geo = (data !== null ? data.location : {});
@@ -165,9 +159,6 @@ class LocationGlobe {
             pin.remove();
         });
         this.globe.pins = [];
-    }
-    getRandomInRange(from, to, fixed) {
-        return (Math.random() * (to - from) + from).toFixed(fixed) * 1;
     }
     updateLoc() {
         if (window.mods.netstat.offline) {
@@ -199,11 +190,10 @@ class LocationGlobe {
             document.querySelector("i.mod_globe_headerInfo").innerText = `${newgeo.latitude}, ${newgeo.longitude}`;
             this.removePins();
             this.removeMarkers();
-            //this.addRandomConnectedPoints();
             this.conns = [];
 
-            this._locPin = this.globe.addPin(newgeo.latitude, newgeo.longitude, "", 1.2);
-            this._locMarker = this.globe.addMarker(newgeo.latitude, newgeo.longitude, "", false, 1.2);
+            this.globe.addPin(newgeo.latitude, newgeo.longitude, "", 1.2);
+            this.globe.addMarker(newgeo.latitude, newgeo.longitude, "", false, 1.2);
         }
 
         this.lastgeo = newgeo;

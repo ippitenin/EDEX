@@ -17,6 +17,9 @@ class DocReader {
             url: window._encodePathURI(path),
             isEvalSupported: false
         });
+        // Arrow functions throughout: `this` inside a plain function callback is undefined in a
+        // class body, so a page queued while another was rendering threw instead of catching up
+        // (AUDIT.md #18 fixed the name, not the binding).
         let pdfDoc = null,
             pageNum = 1,
             pageRendering = false,
@@ -25,26 +28,23 @@ class DocReader {
 
         this.renderPage = (num) => {
             pageRendering = true;
-            loadingTask.promise.then(function (pdf) {
-                pdfDoc.getPage(num).then(function (page) {
-                    const viewport = page.getViewport({ scale: scale });
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+            pdfDoc.getPage(num).then(page => {
+                const viewport = page.getViewport({ scale: scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
 
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: viewport,
-                    };
-                    const renderTask = page.render(renderContext);
-                    renderTask.promise.then(() => {
-                        pageRendering = false;
-                        if (pageNumPending !== null) {
-                            // Was a bare renderPage(): an undefined identifier, so flipping
-                            // pages faster than they render threw instead of catching up.
-                            this.renderPage(pageNumPending);
-                            pageNumPending = null;
-                        }
-                    });
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                };
+                const renderTask = page.render(renderContext);
+                renderTask.promise.then(() => {
+                    pageRendering = false;
+                    if (pageNumPending !== null) {
+                        const next = pageNumPending;
+                        pageNumPending = null;
+                        this.renderPage(next);
+                    }
                 });
             });
             document.getElementById(modalElementId).querySelector(".page_num").textContent = num;
@@ -58,8 +58,9 @@ class DocReader {
             }
         }
 
+        // Both wait for the document: before it has loaded there is no page count to go by.
         this.onPrevPage = () => {
-            if (pageNum <= 1) {
+            if (!pdfDoc || pageNum <= 1) {
                 return;
             }
             pageNum--;
@@ -67,7 +68,7 @@ class DocReader {
         }
 
         this.onNextPage = () => {
-            if (pageNum >= pdfDoc.numPages) {
+            if (!pdfDoc || pageNum >= pdfDoc.numPages) {
                 return;
             }
             pageNum++;
@@ -95,7 +96,8 @@ class DocReader {
         document.getElementById(modalElementId).querySelector(".zoom_in").addEventListener('click', this.zoomIn);
         document.getElementById(modalElementId).querySelector(".zoom_out").addEventListener('click', this.zoomOut);
 
-        pdfjsLib.getDocument({url: window._encodePathURI(path), isEvalSupported: false}).promise.then((pdfDoc_) => {
+        // The same loading task as above; the document used to be fetched and parsed twice.
+        loadingTask.promise.then((pdfDoc_) => {
             pdfDoc = pdfDoc_;
             document.getElementById(modalElementId).querySelector(".page_count").textContent = pdfDoc.numPages;
             this.renderPage(pageNum);

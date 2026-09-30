@@ -25,10 +25,10 @@ See the GNU General Public License for more details.
 
 ## Modifications
 
-Files carrying modifications relative to upstream v2.2.8 were changed on **2026-08-14** and
-**2026-08-15**.
-The changes are summarised in [README.md](README.md) and recorded individually in the commit
-history, as required by section 5(a) of the GPL.
+Files carrying modifications relative to upstream v2.2.8 were changed on **2026-08-14**,
+**2026-08-15**, **2026-08-16**, **2026-08-27**, **2026-09-11** and **2026-09-30**.
+The changes are summarised in [README.md](README.md) and recorded individually, with their dates,
+in the commit history, as required by section 5(a) of the GPL.
 
 The original project's README, with its full credits and acknowledgements, is preserved in
 [README.upstream.md](README.upstream.md).
@@ -39,3 +39,8 @@ This project bundles and depends on third-party open-source software, each under
 license — among them xterm.js, systeminformation, SmoothieCharts, pdf.js, node-pty and the
 ENCOM Globe by Rob "Arscan" Scanlon. Their notices and terms travel with their respective
 packages.
+
+The Cyrillic glyphs of the interface font come from **Play** by Jonas Hecksher (Playtype,
+e-Types AS), copyright © 2011, used under the SIL Open Font License 1.1. The two subset files in
+`src/assets/fonts/` are unmodified copies of the ones Google Fonts distributes, taken from the
+Fontsource package; the license text sits beside them in `play_OFL.txt`.

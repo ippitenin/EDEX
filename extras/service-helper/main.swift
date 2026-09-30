@@ -9,7 +9,6 @@ import Cocoa
 
 let edexBundleID = "com.edex.ui"
 
-@discardableResult
 func runningEDEX() -> NSRunningApplication? {
     NSRunningApplication.runningApplications(withBundleIdentifier: edexBundleID).first
 }

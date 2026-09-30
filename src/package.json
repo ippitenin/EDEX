@@ -1,7 +1,7 @@
 {
   "name": "edex-ui",
   "productName": "EDEX",
-  "version": "2.3.0",
+  "version": "2.4.1",
   "description": "EDEX sci-fi interface",
   "keywords": [
     "desktop",
@@ -41,7 +41,6 @@
     "signale": "1.4.0",
     "smoothie": "^1.36.1",
     "systeminformation": "^5.33.1",
-    "tail": "2.2.4",
     "username": "5.1.0",
     "which": "2.0.2",
     "ws": "^7.5.10",

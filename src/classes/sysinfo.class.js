@@ -17,7 +17,7 @@ class Sysinfo {
 
         // Create DOM
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_sysinfo">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_sysinfo">
             <div>
                 <h1>1970</h1>
                 <h2>JAN 1</h2>
@@ -34,7 +34,7 @@ class Sysinfo {
                 <h1>POWER</h1>
                 <h2>00%</h2>
             </div>
-        </div>`;
+        </div>`);
 
         this.updateDate();
         this.updateUptime();
@@ -98,23 +98,9 @@ class Sysinfo {
         }, timeToNewDay);
     }
     updateUptime() {
-        let uptime = {
-            raw: Math.floor(require("os").uptime()),
-            days: 0,
-            hours: 0,
-            minutes: 0
-        };
+        const {days, hours, minutes} = window._splitDuration(Math.floor(require("os").uptime()));
 
-        uptime.days = Math.floor(uptime.raw/86400);
-        uptime.raw -= uptime.days*86400;
-        uptime.hours = Math.floor(uptime.raw/3600);
-        uptime.raw -= uptime.hours*3600;
-        uptime.minutes = Math.floor(uptime.raw/60);
-
-        if (uptime.hours.toString().length !== 2) uptime.hours = "0"+uptime.hours;
-        if (uptime.minutes.toString().length !== 2) uptime.minutes = "0"+uptime.minutes;
-
-        document.querySelector("#mod_sysinfo > div:nth-child(2) > h2").innerHTML = uptime.days + '<span style="opacity:0.5;">d</span>' + uptime.hours + '<span style="opacity:0.5;">:</span>' + uptime.minutes;
+        document.querySelector("#mod_sysinfo > div:nth-child(2) > h2").innerHTML = days + '<span style="opacity:0.5;">d</span>' + window._pad(hours) + '<span style="opacity:0.5;">:</span>' + window._pad(minutes);
     }
     updateBattery() {
         window.si.battery().then(bat => {

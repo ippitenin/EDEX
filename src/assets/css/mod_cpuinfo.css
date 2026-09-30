@@ -82,16 +82,6 @@ div#mod_cpuinfo em {
     font-style: normal;
 }
 
-div#mod_cpuinfo span {
-    width: 1em;
-    position: relative;
-    top: 0.37vh;
-    right: 0.278vh;
-    text-align: center;
-    overflow: hidden;
-    display: inline-block;
-}
-
 div#mod_cpuinfo i {
     font-style: normal;
     font-size: 1.3vh;

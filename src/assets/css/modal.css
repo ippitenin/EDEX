@@ -47,11 +47,6 @@ div.modal_popup.blink {
     animation-timing-function: linear;
 }
 
-@keyframes blink {
-    0% {background: rgba(var(--color_r), var(--color_g), var(--color_b), 0.0);}
-    100% {background: rgba(var(--color_r), var(--color_g), var(--color_b), 1);}
-}
-
 div.modal_popup > h1 {
     width: 100%;
     cursor: move;
@@ -71,14 +66,6 @@ div.modal_popup > h5 {
     font-weight: normal;
     margin: 0vh;
     margin-bottom: 2vh;
-}
-
-div.modal_popup > h5 > a {
-    color: inherit;
-}
-
-div.modal_popup > h5 > a:hover {
-    font-weight: bold;
 }
 
 div.modal_popup > div:last-child {

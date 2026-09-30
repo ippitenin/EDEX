@@ -9,7 +9,7 @@ class RAMwatcher {
                 <h1>MEMORY<i id="mod_ramwatcher_info"></i></h1>
                 <div id="mod_ramwatcher_pointmap">`;
 
-        for (var i = 0; i < 440; i++) {
+        for (let i = 0; i < 440; i++) {
             ramwatcherDOM += `<div class="mod_ramwatcher_point free"></div>`;
         }
 
@@ -62,16 +62,18 @@ class RAMwatcher {
                 }
             });
 
-            // Update info text
-            let totalGiB = Math.round((data.total/1073742000)*10)/10; // 1073742000 bytes = 1 Gibibyte (GiB), the *10 is to round to .1 decimal
-            let usedGiB = Math.round((data.active/1073742000)*10)/10;
+            // Update info text. 1073742000 is a GiB (1073741824 bytes) rounded, which makes no
+            // difference at one decimal.
+            const toGiB = bytes => Math.round((bytes/1073742000)*10)/10;
+            let totalGiB = toGiB(data.total);
+            let usedGiB = toGiB(data.active);
             document.getElementById("mod_ramwatcher_info").innerText = `USING ${usedGiB} OUT OF ${totalGiB} GiB`;
 
             // Update swap indicator
             let usedSwap = Math.round((100*data.swapused)/data.swaptotal);
             document.getElementById("mod_ramwatcher_swapbar").value = usedSwap || 0;
 
-            let usedSwapGiB = Math.round((data.swapused/1073742000)*10)/10;
+            let usedSwapGiB = toGiB(data.swapused);
             document.getElementById("mod_ramwatcher_swaptext").innerText = `${usedSwapGiB} GiB`;
 
             this.currentlyUpdating = false;

@@ -9,13 +9,6 @@ class AudioManager {
                     src: [path.join(__dirname, "assets", "audio", "stdout.wav")],
                     volume: 0.4
                 });
-                this.stdin = new Howl({
-                    src: [path.join(__dirname, "assets", "audio", "stdin.wav")],
-                    volume: 0.4
-                });
-                this.folder = new Howl({
-                    src: [path.join(__dirname, "assets", "audio", "folder.wav")]
-                });
                 this.granted = new Howl({
                     src: [path.join(__dirname, "assets", "audio", "granted.wav")]
                 });
@@ -35,25 +28,14 @@ class AudioManager {
             this.scan = new Howl({
                 src: [path.join(__dirname, "assets", "audio", "scan.wav")]
             });
-            this.denied = new Howl({
-                src: [path.join(__dirname, "assets", "audio", "denied.wav")]
-            });
-            this.info = new Howl({
-                src: [path.join(__dirname, "assets", "audio", "info.wav")]
-            });
-            this.alarm = new Howl({
-                src: [path.join(__dirname, "assets", "audio", "alarm.wav")]
-            });
-            this.error = new Howl({
-                src: [path.join(__dirname, "assets", "audio", "error.wav")]
-            });
 
             Howler.volume(window.settings.audioVolume);
         } else {
             Howler.volume(0.0);
         }
 
-        // Return a proxy to avoid errors if sounds aren't loaded
+        // Only the sounds something still plays are loaded; the fork's sound scheme dropped the
+        // typing, folder and alert effects. Any other name gets a silent stand-in from the proxy.
         return new Proxy(this, {
             get: (target, sound) => {
                 if (sound in target) {

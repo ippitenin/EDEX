@@ -1,5 +1,5 @@
-// Helpers for the main process: command-line parsing, websocket origin checks and the parsers
-// for the platform tools the terminal shells out to.
+// Helpers for the main process: command-line parsing, websocket origin checks, the parsers for the
+// platform tools the terminal shells out to, and the choices made when a window or a tab opens.
 //
 // These are the pieces where a silent mistake is expensive — a broken origin check exposes the
 // terminal socket, a broken parser makes the process readout go blank — so they live here,
@@ -23,7 +23,7 @@ function extractDirFromArgv(argv, fsImpl = fs) {
         if (typeof arg !== "string" || arg.startsWith("-") || !path.isAbsolute(arg)) continue;
         try {
             if (fsImpl.statSync(arg).isDirectory()) return arg;
-        } catch (e) {
+        } catch {
             // Not a directory, or gone — keep looking.
         }
     }
@@ -81,4 +81,46 @@ function pickNextDisplay(displays, currentId) {
     return displays[(index + 1) % displays.length];
 }
 
-module.exports = {extractDirFromArgv, isAllowedOrigin, parseProcessName, parseCwdOutput, pickNextDisplay};
+/**
+ * Picks the display the window opens on: the one settings.monitor names, if it is still attached,
+ * and the primary one otherwise.
+ *
+ * A string index works too — people edit settings.json by hand, and "1" has always been accepted.
+ * Index 0 is simply the first display in the list, which is not necessarily the primary one.
+ */
+function pickStartDisplay(displays, primary, monitor) {
+    if (!Array.isArray(displays) || isNaN(monitor)) return primary;
+    return displays[monitor] || primary;
+}
+
+/**
+ * Picks the working directory for a new tab.
+ *
+ * The renderer asks either for a specific directory (a folder opened from Finder) or with "true",
+ * meaning "wherever the main shell is now". A directory that has gone away falls back the same way,
+ * and before the main shell has reported anything its start directory stands in.
+ */
+function resolveSpawnCwd(requested, current, fallback, fsImpl = fs) {
+    if (typeof requested === "string" && requested !== "true" && fsImpl.existsSync(requested)) return requested;
+    return current || fallback;
+}
+
+/**
+ * Finds the first unclaimed tab slot. Slots are keyed by port number, so the keys come back in
+ * ascending order; a slot is free when it holds null.
+ */
+function firstFreeSlot(slots) {
+    if (!slots) return null;
+    return Object.keys(slots).find(key => slots[key] === null) ?? null;
+}
+
+module.exports = {
+    extractDirFromArgv,
+    isAllowedOrigin,
+    parseProcessName,
+    parseCwdOutput,
+    pickNextDisplay,
+    pickStartDisplay,
+    resolveSpawnCwd,
+    firstFreeSlot
+};

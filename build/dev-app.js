@@ -16,6 +16,7 @@ const {execFileSync} = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const {stripFinderInfo} = require("./lib/xattr.js");
 
 const projectDir = path.join(__dirname, "..");
 const electronApp = path.join(projectDir, "node_modules", "electron", "dist", "Electron.app");
@@ -83,16 +84,9 @@ function build(version) {
     // default_app.asar sitting beside it. src/node_modules comes along for free.
     fs.symlinkSync(path.join(projectDir, "src"), path.join(contents, "Resources", "app"));
 
-    // ditto faithfully carries over extended attributes, and that includes the empty
-    // com.apple.FinderInfo macOS hangs on bundle directories in watched locations — node_modules
-    // sits inside the project, so the source bundle has one. codesign refuses to sign anything
-    // carrying it. Same removal as in afterPack.js, and for the same reason `xattr -cr` is not used:
-    // it gives up on com.apple.fileprovider.fpfs#P before ever reaching FinderInfo.
-    try {
-        execFileSync("xattr", ["-r", "-d", "com.apple.FinderInfo", bundle], {stdio: "ignore"});
-    } catch {
-        // Nothing to remove is the normal case on an unwatched copy.
-    }
+    // ditto carries over the empty com.apple.FinderInfo from node_modules, which sits inside the
+    // project, and the codesign below would refuse the bundle over it.
+    stripFinderInfo(bundle);
 
     // Rewriting Info.plist invalidates the signature ditto just preserved, and an unsigned bundle
     // will not launch on Apple Silicon. Ad-hoc is enough here and --deep is not needed: every nested

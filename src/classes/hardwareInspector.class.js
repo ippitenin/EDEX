@@ -38,11 +38,7 @@ class HardwareInspector {
         });
     }
     _trimDataString(str, ...filters) {
-        return str.trim().split(" ").filter(word => {
-            if (typeof filters !== "object") return true;
-
-            return !filters.includes(word);
-        }).slice(0, 2).join(" ");
+        return str.trim().split(" ").filter(word => !filters.includes(word)).slice(0, 2).join(" ");
     }
 }
 

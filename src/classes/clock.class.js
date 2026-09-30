@@ -7,11 +7,10 @@ class Clock {
 
         // Create DOM
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_clock" class="${(this.twelveHours) ? "mod_clock_twelve" : ""}">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_clock" class="${(this.twelveHours) ? "mod_clock_twelve" : ""}">
             <h1 id="mod_clock_text"><span>?</span><span>?</span><span>:</span><span>?</span><span>?</span><span>:</span><span>?</span><span>?</span></h1>
-        </div>`;
+        </div>`);
 
-        this.lastTime = new Date();
 
         this.updateClock();
         this.updater = setInterval(() => {
@@ -29,11 +28,7 @@ class Clock {
             if (array[0] === 0) array[0] = 12;
         }
 
-        array.forEach((e, i) => {
-            if (e.toString().length !== 2) {
-                array[i] = "0"+e;
-            }
-        });
+        array = array.map(e => window._pad(e));
         let clockString = `${array[0]}:${array[1]}:${array[2]}`;
         array = clockString.match(/.{1}/g);
         clockString = "";
@@ -45,7 +40,6 @@ class Clock {
         if (this.twelveHours) clockString += `<span>${this.ampm}</span>`;
 
         document.getElementById("mod_clock_text").innerHTML = clockString;
-        this.lastTime = time;
     }
 }
 

@@ -4,7 +4,7 @@ class Netstat {
 
         // Create DOM
         this.parent = document.getElementById(parentId);
-        this.parent.innerHTML += `<div id="mod_netstat">
+        this.parent.insertAdjacentHTML("beforeend", `<div id="mod_netstat">
             <div id="mod_netstat_inner">
                 <h1>NETWORK STATUS<i id="mod_netstat_iname"></i></h1>
                 <div id="mod_netstat_innercontainer">
@@ -22,7 +22,7 @@ class Netstat {
                     </div>
                 </div>
             </div>
-        </div>`;
+        </div>`);
 
         this.offline = false;
         this.lastconn = {finished: false}; // Prevent geoip lookup attempt until maxminddb is loaded

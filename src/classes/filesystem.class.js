@@ -7,7 +7,6 @@ class FilesystemDisplay {
         this.cwd = [];
         this.cwd_path = null;
         this.iconcolor = `rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b})`;
-        this._formatBytes = (a,b) => {if(0==a)return"0 Bytes";var c=1024,d=b||2,e=["Bytes","KB","MB","GB","TB","PB","EB","ZB","YB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(d))+" "+e[f]};
         this.fileIconsMatcher = require("./assets/misc/file-icons-match.js");
         this.icons = require("./assets/icons/file-icons.json");
         this.edexIcons = {
@@ -54,10 +53,54 @@ class FilesystemDisplay {
         };
         this.fsBlock = {};
         this.dirpath = "";
-        this.failed = false;
         this._noTracking = false;
         this._runNextTick = false;
         this._reading = false;
+
+        // The title bar shows the working directory, right-aligned. Its box is half the bar,
+        // but the text may run on to the left through the empty part — up to the label — and
+        // only a path too long even for that is shortened, from the middle. Left alone it
+        // overflowed to the right instead, straight across the keyboard.
+        this._titleDir = "";
+        this._titleRuler = document.createElement("span");
+        this._titleRuler.setAttribute("style", "position:absolute;top:-999vh;left:0;visibility:hidden;white-space:pre;");
+        document.body.appendChild(this._titleRuler);
+        this.fitTitleDir = () => {
+            let dirEl = document.getElementById("fs_disp_title_dir");
+            let labelEl = document.querySelector("section#filesystem > h3.title > p:first-of-type");
+            if (!dirEl || !labelEl) return;
+
+            let box = dirEl.getBoundingClientRect();
+            // Not laid out yet, so nothing to measure against.
+            if (box.width === 0) {
+                dirEl.innerText = this._titleDir;
+                return;
+            }
+
+            // Measured in the real font rather than estimated: the width of a path depends on
+            // the theme, on the window and on whether the name is Latin or Cyrillic.
+            let style = window.getComputedStyle(dirEl);
+            this._titleRuler.style.font = style.font;
+            this._titleRuler.style.letterSpacing = style.letterSpacing;
+            let widthOf = text => {
+                this._titleRuler.textContent = text;
+                return this._titleRuler.getBoundingClientRect().width;
+            };
+
+            let labelEnd = labelEl.getBoundingClientRect().left + widthOf(labelEl.innerText);
+            let gap = 2 * parseFloat(style.fontSize);
+            // The "dotfiles hidden" note is a ::before on the same element and takes its share.
+            let note = container.classList.contains("hideDotfiles") ? widthOf("dotfiles hidden - ") : 0;
+            let room = box.right - labelEnd - gap - note;
+
+            dirEl.innerText = window._shortenPath(this._titleDir, text => widthOf(text) <= room);
+        };
+        this.setTitleDir = text => {
+            this._titleDir = text;
+            this.fitTitleDir();
+        };
+        // Sizes are in vh and vw, so the room for the path changes with the window.
+        window.addEventListener("resize", this.fitTitleDir);
 
         this._timer = setInterval(() => {
             if (this._runNextTick === true) {
@@ -66,37 +109,15 @@ class FilesystemDisplay {
             }
         }, 1000);
 
-        this._asyncFSwrapper = new Proxy(fs, {
-            get: function(fs, prop) {
-                if (prop in fs) {
-                    return function(...args) {
-                        return new Promise((resolve, reject) => {
-                            fs[prop](...args, (err, d) => {
-                                if (typeof err !== "undefined" && err !== null) reject(err);
-                                if (typeof d !== "undefined") resolve(d);
-                                if (typeof d === "undefined" && typeof err === "undefined") resolve();
-                            });
-                        });
-                    }
-                }
-            },
-            set: function() {
-                return false;
-            }
-        });
-
-        this.setFailedState = () => {
-            this.failed = true;
-            container.innerHTML = `
-            <h3 class="title"><p>FILESYSTEM</p><p id="fs_disp_title_dir">EXECUTION FAILED</p></h3>
-            <h2 id="fs_disp_error">CANNOT ACCESS CURRENT WORKING DIRECTORY</h2>`;
-        };
-
         this.followTab = () => {
             // Don't follow tabs when running in detached mode, see #432
             if (this._noTracking) return false;
 
             let num = window.currentTerm;
+
+            // At startup the panel exists before the terminal does; initUI calls back in once
+            // there is a tab to follow.
+            if (!window.term || !window.term[num]) return false;
 
             window.term[num].oncwdchange = cwd => {
                 // See #501
@@ -118,6 +139,15 @@ class FilesystemDisplay {
             };
         };
         this.followTab();
+
+        // Shows a directory without waiting for a terminal to report it — the startup case,
+        // where the panel appears together with the keyboard. Recording it as the tracked path
+        // is what stops the terminal's first report of the same directory from redrawing it.
+        this.showDir = dir => {
+            this.cwd_path = dir;
+            this.readFS(dir);
+            this.watchFS(dir);
+        };
 
         this.watchFS = dir => {
             if (this._fsWatcher) {
@@ -147,6 +177,7 @@ class FilesystemDisplay {
                 container.classList.add("hideDotfiles");
                 window.settings.hideDotfiles = true;
             }
+            this.fitTitleDir();
         };
 
         this.toggleListview = () => {
@@ -159,91 +190,108 @@ class FilesystemDisplay {
             }
         };
 
+        // A read that failed used to leave the panel dead for the rest of the session: _reading
+        // stayed set, or the failed state had replaced the panel's markup — the title and the disk
+        // bar with it — and every later read returned straight away.
         this.readFS = async dir => {
-            if (this.failed === true || this._reading) return false;
+            if (this._reading) return false;
             this._reading = true;
+            try {
+                return await this._readFS(dir);
+            } finally {
+                this._reading = false;
+            }
+        };
 
-            document.getElementById("fs_disp_title_dir").innerText = this.dirpath;
+        this._readFS = async dir => {
             this.filesContainer.setAttribute("class", "");
             this.filesContainer.innerHTML = "";
             if (this._noTracking) {
                 document.querySelector("section#filesystem > h3.title > p:first-of-type").innerText = "FILESYSTEM - TRACKING FAILED, RUNNING DETACHED FROM TTY";
             }
+            // After the label: a longer label leaves less room for the path.
+            this.setTitleDir(this.dirpath);
 
             if (process.platform === "win32" && dir.endsWith(":")) dir = dir+"\\";
             let tcwd = dir;
-            let content = await this._asyncFSwrapper.readdir(tcwd).catch(err => {
+            let content;
+            try {
+                content = await fs.promises.readdir(tcwd);
+            } catch (err) {
                 console.warn(err);
-                if (this._noTracking === true && this.dirpath) { // #262
-                    this.setFailedState();
+                // In place of the listing, so the panel recovers as soon as the shell moves on.
+                this.filesContainer.innerHTML = `<h2 id="fs_disp_error">CANNOT ACCESS ${window._escapeHtml(tcwd)}</h2>`;
+                // Detached from the terminal nothing else will move it, so go back. See #262.
+                if (this._noTracking === true && this.dirpath && this.dirpath !== tcwd) {
                     setTimeout(() => {
                         this.readFS(this.dirpath);
                     }, 1000);
-                } else {
-                    this.setFailedState();
                 }
-            });
+                return false;
+            }
 
             this.reCalculateDiskUsage(tcwd);
 
             this.cwd = [];
 
-            await new Promise((resolve, reject) => {
-                if (content.length === 0) resolve();
+            // Every entry is stat'ed at once and the listing waits for all of them. It used to wait
+            // for the one that happened to be last in the directory, so any entry whose lstat
+            // came back after that one was silently left out of the panel.
+            await Promise.all(content.map(async file => {
+                let fstat;
+                try {
+                    fstat = await fs.promises.lstat(path.join(tcwd, file));
+                } catch (err) {
+                    // Deleted between readdir and lstat — a swap file, a lock file, npm at work.
+                    // That used to put the whole panel into its failed state for good.
+                    if (err.code === "ENOENT") return;
+                    // Anything else unreadable is listed as a system entry, as EPERM and EBUSY were.
+                }
 
-                content.forEach(async (file, i) => {
-                    let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
-                        if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
-                            reject();
-                        }
-                    });
+                // The raw name: it is escaped where it meets markup and quoted where it meets the
+                // shell. Storing it pre-escaped made a folder called R&D come out as cd "R&amp;D".
+                let e = {
+                    name: file,
+                    path: path.resolve(tcwd, file),
+                    type: "other",
+                    category: "other",
+                    hidden: false
+                };
 
-                    let e = {
-                        name: window._escapeHtml(file),
-                        path: path.resolve(tcwd, file),
-                        type: "other",
-                        category: "other",
-                        hidden: false
-                    };
+                if (typeof fstat !== "undefined") {
+                    e.lastAccessed = fstat.mtime.getTime();
 
-                    if (typeof fstat !== "undefined") {
-                        e.lastAccessed = fstat.mtime.getTime();
+                    if (fstat.isDirectory()) {
+                        e.category = "dir";
+                        e.type = "dir";
+                    }
+                    if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
+                    if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
 
-                        if (fstat.isDirectory()) {
-                            e.category = "dir";
-                            e.type = "dir";
-                        }
-                        if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
-                        if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
-
-                        if (fstat.isSymbolicLink()) {
-                            e.category = "symlink";
-                            e.type = "symlink";
-                        }
-
-                        if (fstat.isFile()) {
-                            e.category = "file";
-                            e.type = "file";
-                            e.size = fstat.size;
-                        }
-                    } else {
-                        e.type = "system";
-                        e.hidden = true;
+                    if (fstat.isSymbolicLink()) {
+                        e.category = "symlink";
+                        e.type = "symlink";
                     }
 
-                    if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
-                    if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
-                    if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
-                    if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
+                    if (fstat.isFile()) {
+                        e.category = "file";
+                        e.type = "file";
+                        e.size = fstat.size;
+                    }
+                } else {
+                    e.type = "system";
+                    e.hidden = true;
+                }
 
-                    if (file.startsWith(".")) e.hidden = true;
+                if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
+                if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
+                if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
+                if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
 
-                    this.cwd.push(e);
-                    if (i === content.length-1) resolve();
-                });
-            }).catch(() => { this.setFailedState() });
+                if (file.startsWith(".")) e.hidden = true;
 
-            if (this.failed) return false;
+                this.cwd.push(e);
+            }));
 
             let ordering = {
                 dir: 0,
@@ -270,12 +318,9 @@ class FilesystemDisplay {
 
             this.dirpath = tcwd;
             this.render(this.cwd);
-            this._reading = false;
         };
 
         this.readDevices = async () => {
-            if (this.failed === true) return false;
-
             let blocks = await window.si.blockDevices();
             let devices = [];
             blocks.forEach(block => {
@@ -300,28 +345,32 @@ class FilesystemDisplay {
             // Work on a clone of the blocklist to avoid altering fsDisp.cwd
             let blockList = JSON.parse(JSON.stringify(originBlockList));
 
-            if (this.failed === true) return false;
-
             if (isDiskView) {
-                document.getElementById("fs_disp_title_dir").innerText = "Showing available block devices";
                 this.filesContainer.setAttribute("class", "disks");
             } else {
-                document.getElementById("fs_disp_title_dir").innerText = this.dirpath;
                 this.filesContainer.setAttribute("class", "");
             }
             if (this._noTracking) {
                 document.querySelector("section#filesystem > h3.title > p:first-of-type").innerText = "FILESYSTEM - TRACKING FAILED, RUNNING DETACHED FROM TTY";
             }
+            this.setTitleDir(isDiskView ? "Showing available block devices" : this.dirpath);
 
+            // The click handlers below are strings in an onclick attribute, so nothing from the
+            // disk may be spliced into them: HTML escaping is undone before the JavaScript runs,
+            // and a quote in a file name broke out of the string. They carry only an index into
+            // fsDisp._shown, which is assigned together with the markup it describes, and whatever
+            // goes to the shell is quoted by quoteForShell — hand-made double quotes still ran
+            // $(...) in a folder name the moment it was clicked.
             let filesDOM = ``;
             blockList.forEach((e, blockIndex) => {
                 let hidden = e.hidden ? " hidden" : "";
+                const entry = `fsDisp._shown[${blockIndex}]`;
 
                 let cmdPrefix = `if (window.keyboard.container.dataset.isCtrlOn == "true") {
-                                electron.shell.openPath(fsDisp.cwd[${blockIndex}].path);
+                                electron.shell.openPath(${entry}.path);
                                 electronWin.minimize();
                             } else if (window.keyboard.container.dataset.isShiftOn == "true") {
-                                window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"");
+                                window.term[window.currentTerm].write(window._quoteForShell(${entry}.path));
                             } else {
                           `.replace(/\n+ */g, ''); // Minify
 
@@ -331,27 +380,27 @@ class FilesystemDisplay {
 
                 if (!this._noTracking) {
                     if (e.type === "dir" || e.type.endsWith("Dir")) {
-                        cmd = `window.term[window.currentTerm].writelr("cd \\""+fsDisp.cwd[${blockIndex}].name+"\\"")`;
+                        cmd = `window.term[window.currentTerm].writelr("cd "+window._quoteForShell(${entry}.name))`;
                     } else if (e.type === "up") {
                         cmd = `window.term[window.currentTerm].writelr("cd ..")`;
                     } else if (e.type === "disk" || e.type === "rom" || e.type === "usb") {
                         if (process.platform === "win32") {
-                            cmd = `window.term[window.currentTerm].writelr("${e.path.replace(/\\/g, '')}")`;
+                            cmd = `window.term[window.currentTerm].writelr(${entry}.path.replace(/\\\\/g, ""))`;
                         } else {
-                            cmd = `window.term[window.currentTerm].writelr("cd \\"${e.path.replace(/\\/g, '')}\\"")`;
+                            cmd = `window.term[window.currentTerm].writelr("cd "+window._quoteForShell(${entry}.path))`;
                         }
                     } else {
-                        cmd = `window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"")`;
+                        cmd = `window.term[window.currentTerm].write(window._quoteForShell(${entry}.path))`;
                     }
                 } else {
                     if (e.type === "dir" || e.type.endsWith("Dir")) {
-                        cmd = `window.fsDisp.readFS(fsDisp.cwd[${blockIndex}].path)`;
+                        cmd = `window.fsDisp.readFS(${entry}.path)`;
                     } else if (e.type === "up") {
                         cmd = `window.fsDisp.readFS(path.resolve(window.fsDisp.dirpath, ".."))`;
                     } else if (e.type === "disk" || e.type === "rom" || e.type === "usb") {
-                        cmd = `window.fsDisp.readFS("${e.path.replace(/\\/g, '')}")`;
+                        cmd = `window.fsDisp.readFS(${entry}.path)`;
                     } else {
-                        cmd = `window.term[window.currentTerm].write("\\""+fsDisp.cwd[${blockIndex}].path+"\\"")`;
+                        cmd = `window.term[window.currentTerm].write(window._quoteForShell(${entry}.path))`;
                     }
                 }
 
@@ -370,16 +419,16 @@ class FilesystemDisplay {
                 }
 
                 if (e.type === "up") {
-                    // cmd is OS-specific and defined above
+                    // cmd is set above; going up has no Ctrl or Shift variant
                     cmdPrefix = '';
                     cmdSuffix = '';
                 }
 
                 if (e.type === "edex-theme") {
-                    cmd = `window.themeChanger("${e.name.slice(0, -5)}")`;
+                    cmd = `window.themeChanger(${entry}.name.slice(0, -5))`;
                 }
                 if (e.type === "edex-kblayout") {
-                    cmd = `window.remakeKeyboard("${e.name.slice(0, -5)}")`;
+                    cmd = `window.remakeKeyboard(${entry}.name.slice(0, -5))`;
                 }
                 if (e.type === "edex-settings") {
                     cmd = `window.openSettings()`;
@@ -460,12 +509,12 @@ class FilesystemDisplay {
 
                 // Handle displayable media
                 if (e.type === 'video' || e.type === 'audio' || e.type === 'image') {
-                    this.cwd[blockIndex].type = e.type;
+                    originBlockList[blockIndex].type = e.type;
                     cmd = `window.fsDisp.openMedia(${blockIndex})`;
                 }
 
                 if (typeof e.size === "number") {
-                    e.size = this._formatBytes(e.size);
+                    e.size = window._formatBytes(e.size);
                 } else {
                     e.size = "--";
                 }
@@ -479,12 +528,13 @@ class FilesystemDisplay {
                                 <svg viewBox="0 0 ${icon.width} ${icon.height}" fill="${this.iconcolor}">
                                     ${icon.svg}
                                 </svg>
-                                <h3>${e.name}</h3>
+                                <h3>${window._escapeHtml(e.name)}</h3>
                                 <h4>${type}</h4>
                                 <h4>${e.size}</h4>
                                 <h4>${e.lastAccessed}</h4>
                             </div>`;
             });
+            this._shown = originBlockList;
             this.filesContainer.innerHTML = filesDOM;
 
             if (this.filesContainer.getAttribute("class").endsWith("disks")) {
@@ -500,7 +550,6 @@ class FilesystemDisplay {
                 e.setAttribute("class", e.className.replace(" animationWait", ""));
 
                 if (window.settings.hideDotfiles !== true || e.className.indexOf("hidden") === -1) {
-                    // Filesystem refresh sound disabled
                     await _delay(30);
                 }
 
@@ -513,10 +562,7 @@ class FilesystemDisplay {
             this.space_bar.text.innerHTML = "Calculating available space...";
             this.space_bar.bar.removeAttribute("value");
 
-            window.si.fsSize().catch(() => {
-                this.space_bar.text.innerHTML = "Could not calculate mountpoint usage.";
-                this.space_bar.bar.value = 100;
-            }).then(d => {
+            window.si.fsSize().then(d => {
                 d.forEach(fsBlock => {
                     if (path.startsWith(fsBlock.mount)) {
                         this.fsBlock = fsBlock;
@@ -548,21 +594,16 @@ class FilesystemDisplay {
             }
         };
 
-        // Automatically start indexing supposed beginning CWD
-        // See #365
-        // ...except if we're hot-reloading, in which case this can mess up the rendering
-        // See #392
-        if (window.performance.navigation.type === 0) {
-            this.readFS(window.term[window.currentTerm].cwd || window.settings.cwd);
-        }
+        // The first directory is not read from here any more. The constructor used to guess it
+        // from the terminal (#365) — except on a hot reload, where the guess and the terminal's
+        // own report raced each other (#392). initUI now hands over the shell's real directory
+        // through showDir, before a terminal exists, and that covers both cases.
 
-        this.openFile = (name, path, type) => { //Might add text formatting at some point, not now though - Surge
-            let block;
-
-            if (typeof name === "number") {
-                block = this.cwd[name];
-                name = block.name;
-            }
+        // Both take the index of an entry on screen. _shown, not cwd: a refresh rebuilds cwd while
+        // the click that led here still refers to the listing being shown.
+        this.openFile = index => {
+            const block = this._shown[index];
+            const name = block.name;
 
             let mime = require("mime-types");
 
@@ -602,7 +643,7 @@ class FilesystemDisplay {
                     const newModal = new Modal(
                         {
                             type: "custom",
-                            title: _escapeHtml(name),
+                            title: window._escapeHtml(name),
                             html: html
                         }
                     );
@@ -617,52 +658,69 @@ class FilesystemDisplay {
                     if (mime.charset(filetype) === "UTF-8") {
                         fs.readFile(block.path, 'utf-8', (err, data) => {
                             if (err) {
+                                // message, not html: an info modal ignores html and showed its
+                                // placeholder text. And no editor after it — it opened on the text
+                                // "undefined", and Save wrote that over the file.
                                 new Modal({
                                     type: "info",
                                     title: "Failed to load file: " + window._escapeHtml(block.path),
-                                    html: window._escapeHtml(err)
+                                    message: window._escapeHtml(err.message)
                                 });
                                 console.log(err);
-                            };
+                                return;
+                            }
                             window.keyboard.detach();
-                            new Modal(
+                            // The path stays in this closure rather than in an onclick string, where
+                            // a quote in the file name broke out of it. Each editor saves its own
+                            // textarea: they used to share an id, and the second one saved the first.
+                            let textarea, status;
+                            const editor = new Modal(
                                 {
                                     type: "custom",
-                                    title: _escapeHtml(name),
-                                    html: `<textarea id="fileEdit" rows="40" cols="150" spellcheck="false">${data}</textarea><p id="fedit-status"></p>`,
+                                    title: window._escapeHtml(name),
+                                    html: `<textarea class="fileEdit" rows="40" cols="150" spellcheck="false"></textarea><p class="fedit-status"></p>`,
                                     buttons: [
-                                        {label:"Save to Disk",action:`window.writeFile('${block.path}')`}
+                                        {label: "Save to Disk", action: () => {
+                                            fs.writeFile(block.path, textarea.value, "utf-8", err => {
+                                                status.innerHTML = err
+                                                    ? `<i>Could not save: ${window._escapeHtml(err.message)}</i>`
+                                                    : "<i>File saved.</i>";
+                                            });
+                                        }}
                                     ]
                                 }, () => {
                                     window.keyboard.attach();
                                     window.term[window.currentTerm].term.focus();
                                 }
                             );
+                            const editorEl = document.getElementById("modal_"+editor.id);
+                            textarea = editorEl.querySelector("textarea.fileEdit");
+                            status = editorEl.querySelector("p.fedit-status");
+                            // Through .value, never through the HTML parser: a file containing
+                            // </textarea> closed the element and whatever followed ran as markup.
+                            textarea.value = data;
                         });
                    break;
                 }
             }
         };
 
-        this.openMedia = (name, path, type) => {
-            let block, html;
-
-            if (typeof name === "number") {
-                block = this.cwd[name];
-                name = block.name;
-            }
+        this.openMedia = index => {
+            const block = this._shown[index];
+            const name = block.name;
+            let html;
 
             block.path = block.path.replace(/\\/g, "/");
 
-            switch (type || block.type) {
+            switch (block.type) {
                 case "image":
-                    html = `<img class="fsDisp_mediaDisp" src="${window._encodePathURI(path || block.path)}" ondragstart="return false;">`;
+                    html = `<img class="fsDisp_mediaDisp" src="${window._encodePathURI(block.path)}" ondragstart="return false;">`;
                     break;
                 case "audio":
                     html = `<div>
                                 <div class="media_container" data-fullscreen="false">
                                     <audio class="media fsDisp_mediaDisp" preload="auto">
-                                        <source src="${window._encodePathURI(path || block.path)}">
+                                        <source src="${window._encodePathURI(block.path)}">
                                         Unsupported audio format!
                                     </audio>
                                     <div class="media_controls" data-state="hidden">
@@ -694,7 +752,7 @@ class FilesystemDisplay {
                     html = `<div>
                                 <div class="media_container" data-fullscreen="false">
                                     <video class="media fsDisp_mediaDisp" preload="auto">
-                                        <source src="${window._encodePathURI(path || block.path)}">
+                                        <source src="${window._encodePathURI(block.path)}">
                                         Unsupported video format!
                                     </video>
                                     <div class="media_controls" data-state="hidden">
@@ -728,12 +786,12 @@ class FilesystemDisplay {
                             </div>`;
                     break;
                 default:
-                    throw new Error("fsDisp media displayer: unknown type " + (type || block.type));
+                    throw new Error("fsDisp media displayer: unknown type " + block.type);
             }
 
             const newModal = new Modal({
                 type: "custom",
-                title: _escapeHtml(name),
+                title: window._escapeHtml(name),
                 html
             });
             if (block.type === "audio" || block.type === "video") {

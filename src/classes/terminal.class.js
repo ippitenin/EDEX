@@ -15,14 +15,8 @@ class Terminal {
             this.oncwdchange = () => {};
 
             this._sendSizeToServer = () => {
-                let cols = this.term.cols.toString();
-                let rows = this.term.rows.toString();
-                while (cols.length < 3) {
-                    cols = "0"+cols;
-                }
-                while (rows.length < 3) {
-                    rows = "0"+rows;
-                }
+                let cols = window._pad(this.term.cols, 3);
+                let rows = window._pad(this.term.rows, 3);
                 this.Ipc.send("terminal_channel-"+this.port, "Resize", cols, rows);
             };
 
@@ -59,16 +53,12 @@ class Terminal {
 
                     let arg = step.slice(step.indexOf("(")+1, step.indexOf(")"));
 
-                    if (typeof Number(arg) === "number") {
-                        a[i] = {
-                            func,
-                            arg: [Number(arg)]
-                        };
-                        window.isTermFilterValidated = true;
-                        return true;
-                    }
-
-                    return false;
+                    a[i] = {
+                        func,
+                        arg: [Number(arg)]
+                    };
+                    window.isTermFilterValidated = true;
+                    return true;
                 });
             }
 
@@ -193,14 +183,9 @@ class Terminal {
                 }
             };
 
-            this.lastSoundFX = Date.now();
             this.socket.addEventListener("message", e => {
                 let d = Date.now();
 
-                if (d - this.lastSoundFX > 30) {
-                    // Terminal output sound disabled
-                    this.lastSoundFX = d;
-                }
                 if (d - this.lastRefit > 10000) {
                     this.fit();
                 }
@@ -262,7 +247,6 @@ class Terminal {
                 let d = gcd(w, h);
 
                 if (d === 100) { y = 1; x = 3;}
-                // if (d === 120) y = 1;
                 if (d === 256) x = 2;
 
                 if (window.settings.termFontSize < 15) y = y - 1;
@@ -288,18 +272,22 @@ class Terminal {
                 this.socket.send(cmd+"\r");
             };
 
+            // Unlike write, this goes through xterm, which wraps the text in bracketed-paste
+            // markers when the running program has asked for them. That is how a program tells
+            // a paste from typing — and the only way Claude Code notices a dropped image path.
+            this.paste = text => {
+                this.term.paste(text);
+            };
+
             this.clipboard = {
                 copy: () => {
                     if (!this.term.hasSelection()) return false;
                     document.execCommand("copy");
                     this.term.clearSelection();
-                    this.clipboard.didCopy = true;
                 },
                 paste: () => {
                     this.write(remote.clipboard.readText());
-                    this.clipboard.didCopy = false;
-                },
-                didCopy: false
+                }
             };
 
         } else if (opts.role === "server") {
@@ -321,7 +309,7 @@ class Terminal {
             this._closed = false;
             this.onclosed = () => {};
             this.onopened = () => {};
-            this.onresize = () => {};
+            this.onresized = () => {};
             this.ondisconnected = () => {};
 
             this._disableCWDtracking = false;
@@ -404,7 +392,7 @@ class Terminal {
                             this._disableCWDtracking = true;
                             try {
                                 this.renderer.send("terminal_channel-"+this.port, "Fallback cwd", opts.cwd || process.env.PWD);
-                            } catch(e) {
+                            } catch {
                                 // renderer closed
                             }
                         }
@@ -424,7 +412,7 @@ class Terminal {
                             console.log("Error while retrieving TTY subprocess: ", e);
                             try {
                                 this.renderer.send("terminal_channel-"+this.port, "New process", "");
-                            } catch(e) {
+                            } catch {
                                 // renderer closed
                             }
                         }
@@ -451,14 +439,17 @@ class Terminal {
                 port: this.port,
                 clientTracking: true,
                 verifyClient: info => {
-                    // Single-client limit
-                    if (this.wss.clients.length >= 1) return false;
+                    // Single-client limit. clients is a Set: this compared .length, which is
+                    // undefined, so the limit never applied — and isAllowedOrigin lets any local
+                    // process without an Origin header through.
+                    if (this.wss.clients.size >= 1) return false;
                     // Only the local EDEX renderer, which loads from file://, may attach —
                     // see isAllowedOrigin and its tests.
                     return this._isAllowedOrigin(info.origin);
                 }
             });
-            this.Ipc.on("terminal_channel-"+this.port, (e, ...args) => {
+            this._channel = "terminal_channel-"+this.port;
+            this._onChannel = (e, ...args) => {
                 switch(args[0]) {
                     case "Renderer startup":
                         this.renderer = e.sender;
@@ -474,7 +465,7 @@ class Terminal {
                         let rows = args[2];
                         try {
                             this.tty.resize(Number(cols), Number(rows));
-                        } catch (error) {
+                        } catch {
                             //Keep going, it'll work anyways.
                         }
                         this.onresized(cols, rows);
@@ -482,7 +473,8 @@ class Terminal {
                     default:
                         return;
                 }
-            });
+            };
+            this.Ipc.on(this._channel, this._onChannel);
             this.wss.on("connection", ws => {
                 this.onopened(this.tty._pid);
                 ws.on("close", (code, reason) => {
@@ -496,14 +488,27 @@ class Terminal {
                     this._nextTickUpdateProcess = true;
                     try {
                         ws.send(data);
-                    } catch (e) {
+                    } catch {
                         // Websocket closed
                     }
                 });
             });
 
+            // The shell's directory as the tick above last saw it; undefined until it reports one.
+            // The main process asks when a tab opens or the filesystem panel needs somewhere to start.
+            this.getCwd = () => this.tty._cwd;
+
+            // Closing takes down everything the terminal holds, not just the shell. The tick and the
+            // channel listener used to outlive a closed tab, and the next tab on the same port heard
+            // the dead one's "New cwd". _closed is not enough of a guard: onExit sets it too.
+            this._disposed = false;
             this.close = () => {
+                if (this._disposed) return;
+                this._disposed = true;
+                clearInterval(this._tick);
+                this.Ipc.removeListener(this._channel, this._onChannel);
                 this.tty.kill();
+                this.wss.close();
                 this._closed = true;
             };
         } else {

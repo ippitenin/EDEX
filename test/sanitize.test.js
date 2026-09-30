@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const {execFileSync} = require("node:child_process");
-const {escapeHtml, purifyCSS, quoteForShell} = require("../src/utils/sanitize.js");
+const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste, encodePathURI} = require("../src/utils/sanitize.js");
 
 test("escapeHtml neutralises tags", () => {
     assert.strictEqual(
@@ -82,4 +82,84 @@ test("quoteForShell defuses a command injection attempt", () => {
     // Left unquoted, this would end the argument and run rm. Quoted, it stays a file name.
     const hostile = "/tmp/'; rm -rf ~; '";
     assert.strictEqual(shellRoundTrip(hostile), hostile);
+});
+
+test("escapePathForPaste leaves a plain path untouched", () => {
+    assert.strictEqual(escapePathForPaste("/Users/me/Pictures/shot-1_final.v2.png"), "/Users/me/Pictures/shot-1_final.v2.png");
+});
+
+test("escapePathForPaste escapes spaces the way Terminal.app does", () => {
+    assert.strictEqual(escapePathForPaste("/Users/me/My Files/a b.png"), "/Users/me/My\\ Files/a\\ b.png");
+});
+
+test("escapePathForPaste keeps Cyrillic readable", () => {
+    assert.strictEqual(escapePathForPaste("/Users/me/Снимок экрана.png"), "/Users/me/Снимок\\ экрана.png");
+});
+
+function pasteRoundTrip(value) {
+    return execFileSync("/bin/sh", ["-c", `printf '%s' ${escapePathForPaste(value)}`], {encoding: "utf8"});
+}
+
+test("escapePathForPaste survives a round trip through a real shell", () => {
+    for (const value of [
+        "/Users/me/Documents",
+        "/Users/me/My Files",
+        "/tmp/don't",
+        "/tmp/Отчёт (2026).pdf",
+        '/tmp/say "hi"',
+        "/tmp/back\\slash",
+        "/tmp/$HOME/${PATH}",
+        "/tmp/`whoami`",
+        "/tmp/a*b?c[d]",
+        "/tmp/~tilde & #hash; pipe|.png",
+        "/tmp/'; rm -rf ~; '",
+        // macOS puts a narrow no-break space before AM/PM in screenshot names.
+        "/tmp/Screenshot 2026-09-30 at 3.37.10\u202fPM.png",
+        "/tmp/two\nlines.png",
+        "/tmp/tab\there.png"
+    ]) {
+        assert.strictEqual(pasteRoundTrip(value), value, `mangled: ${JSON.stringify(value)}`);
+    }
+});
+
+// What Claude Code does with a paste, reduced to the steps that decide whether a dropped image
+// becomes an attachment: split on a space that precedes a slash, strip one pair of outer quotes,
+// drop the backslashes. Several paths must come out the other end as several paths.
+function readPasteLikeClaudeCode(text) {
+    return text.split(/ (?=\/)/).filter(part => part.trim()).map(part => {
+        part = part.trim();
+        if (/^(".*"|'.*')$/.test(part)) part = part.slice(1, -1);
+        return part.replace(/\\(.)/g, "$1");
+    });
+}
+
+test("escapePathForPaste keeps several dropped files apart for a program reading the paste", () => {
+    const files = ["/Users/me/My Files/one.png", "/tmp/don't.png", "/Users/me/Снимок экрана (2).png"];
+    const pasted = files.map(escapePathForPaste).join(" ")+" ";
+    assert.deepStrictEqual(readPasteLikeClaudeCode(pasted), files);
+});
+
+test("quoteForShell would not survive the same reading, which is why drops do not use it", () => {
+    const files = ["/tmp/one.png", "/tmp/two.png"];
+    const pasted = files.map(quoteForShell).join(" ")+" ";
+    assert.notDeepStrictEqual(readPasteLikeClaudeCode(pasted), files);
+});
+
+test("escapePathForPaste coerces non-strings instead of throwing", () => {
+    assert.strictEqual(escapePathForPaste(undefined), "");
+    assert.strictEqual(escapePathForPaste(null), "");
+    assert.strictEqual(escapePathForPaste(42), "42");
+});
+
+test("encodePathURI keeps a # in a path from starting a fragment", () => {
+    assert.strictEqual(encodePathURI("/Users/me/C#/song.mp3"), "/Users/me/C%23/song.mp3");
+    const url = new URL("file://" + encodePathURI("/Users/me/C#/song.mp3"));
+    assert.strictEqual(url.hash, "");
+    assert.strictEqual(decodeURIComponent(url.pathname), "/Users/me/C#/song.mp3");
+});
+
+test("encodePathURI encodes spaces, quotes and non-ASCII names and leaves the slashes", () => {
+    assert.strictEqual(encodePathURI("/My Files/\"q\".pdf"), "/My%20Files/%22q%22.pdf");
+    assert.strictEqual(encodePathURI("/Документы/отчёт.pdf"), encodeURI("/Документы/отчёт.pdf"));
+    assert.strictEqual(encodePathURI("/a%b"), "/a%25b");
 });

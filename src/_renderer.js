@@ -3,15 +3,38 @@ window.eval = global.eval = function () {
     throw new Error("eval() is disabled for security reasons.");
 };
 // Security helpers — implementations and their tests live in utils/sanitize.js
-const {escapeHtml, purifyCSS, quoteForShell} = require("./utils/sanitize.js");
+const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste, encodePathURI} = require("./utils/sanitize.js");
 // Window helpers — same story, see utils/system.js
 const {pickNextDisplay} = require("./utils/system.js");
+// Which physical key each slot of the on-screen keyboard stands for, what its dead keys do and the
+// control sequences it sends, see utils/keyboard.js
+const {codeForKeySlot, applyDeadKey, CTRLSEQ, KEY_SEQUENCES, parseShortcutTrigger} = require("./utils/keyboard.js");
+// Numbers into the text the panels show, and the process list they share, see utils/format.js
+// and utils/processes.js
+const {pad, splitDuration, formatRuntime, formatMediaTime, formatBytes} = require("./utils/format.js");
+const {mergeThreadsByName, compareByLoad} = require("./utils/processes.js");
+// Shows settings.env as JSON in the settings editor and reads it back, see utils/config.js
+const {formatEnvSetting, parseEnvSetting} = require("./utils/config.js");
+// Fits the working directory into the filesystem panel's title bar and keeps theme and layout
+// names inside their folders, see utils/paths.js
+const {shortenPath, resolveNamedFile} = require("./utils/paths.js");
 window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
-window._encodePathURI = uri => {
-    return encodeURI(uri).replace(/#/g, "%23");
-};
+window._codeForKeySlot = codeForKeySlot;
+window._applyDeadKey = applyDeadKey;
+window._ctrlseq = CTRLSEQ;
+window._keySequences = KEY_SEQUENCES;
+window._parseShortcutTrigger = parseShortcutTrigger;
+window._pad = pad;
+window._splitDuration = splitDuration;
+window._formatRuntime = formatRuntime;
+window._formatMediaTime = formatMediaTime;
+window._formatBytes = formatBytes;
+window._mergeThreadsByName = mergeThreadsByName;
+window._compareByLoad = compareByLoad;
+window._shortenPath = shortenPath;
+window._encodePathURI = encodePathURI;
 window._delay = ms => {
     return new Promise((resolve, reject) => {
         setTimeout(resolve, ms);
@@ -38,32 +61,30 @@ const settingsFile = path.join(settingsDir, "settings.json");
 const shortcutsFile = path.join(settingsDir, "shortcuts.json");
 const lastWindowStateFile = path.join(settingsDir, "lastWindowState.json");
 
+// Theme and layout names reach require() from settings.json and from the hotswitch message. See
+// resolveNamedFile for why they are held to their own folder.
+function configFile(dir, name, kind) {
+    const file = resolveNamedFile(dir, name, ".json");
+    if (file === null) throw new Error(`Not a valid ${kind} name: ${name}`);
+    return file;
+}
+
 // Load config
 window.settings = require(settingsFile);
 window.shortcuts = require(shortcutsFile);
 window.lastWindowState = require(lastWindowStateFile);
 
 // Load CLI parameters
-if (remote.process.argv.includes("--nointro")) {
-    window.settings.nointroOverride = true;
-} else {
-    window.settings.nointroOverride = false;
-}
-if (remote.process.argv.includes("--nocursor")) {
-    window.settings.nocursorOverride = true;
-} else {
-    window.settings.nocursorOverride = false;
-}
+window.settings.nointroOverride = remote.process.argv.includes("--nointro");
+window.settings.nocursorOverride = remote.process.argv.includes("--nocursor");
 
 // Retrieve theme override (hotswitch)
 ipc.once("getThemeOverride", (e, theme) => {
     if (theme !== null) {
         window.settings.theme = theme;
         window.settings.nointroOverride = true;
-        _loadTheme(require(path.join(themesDir, window.settings.theme+".json")));
-    } else {
-        _loadTheme(require(path.join(themesDir, window.settings.theme+".json")));
     }
+    _loadTheme(require(configFile(themesDir, window.settings.theme, "theme")));
 });
 ipc.send("getThemeOverride");
 // Same for keyboard override/hotswitch
@@ -74,6 +95,14 @@ ipc.once("getKbOverride", (e, layout) => {
     }
 });
 ipc.send("getKbOverride");
+
+// Cyrillic for the UI font: Play (SIL OFL, see assets/fonts/play_OFL.txt), split the way Google
+// Fonts ships it. The first file covers Russian, Ukrainian, Belarusian, Bulgarian and Serbian;
+// the second the rest of the script.
+const cyrillicCompanion = {
+    "play_cyrillic.woff2": "U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116",
+    "play_cyrillic_ext.woff2": "U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F"
+};
 
 // Load UI theme
 window._loadTheme = theme => {
@@ -86,6 +115,25 @@ window._loadTheme = theme => {
     let mainFont = new FontFace(theme.cssvars.font_main, `url("${path.join(fontsDir, theme.cssvars.font_main.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
     let lightFont = new FontFace(theme.cssvars.font_main_light, `url("${path.join(fontsDir, theme.cssvars.font_main_light.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
     let termFont = new FontFace(theme.terminal.fontFamily, `url("${path.join(fontsDir, theme.terminal.fontFamily.toLowerCase().replace(/ /g, '_')+'.woff2').replace(/\\/g, '/')}")`);
+
+    // United Sans, which every bundled theme uses, has no Cyrillic. Russian file names fell
+    // through to the system sans-serif — Helvetica, wider and heavier, visibly another font.
+    // Play's Cyrillic is registered under the theme's own family names instead, so everything
+    // already styled with --font_main or --font_main_light picks it up without a CSS change;
+    // the unicode-range keeps it away from Latin text.
+    //
+    // These go in before the theme's faces on purpose. When faces of one family overlap,
+    // Chromium asks the one added last first — so a theme whose font has Cyrillic of its own
+    // keeps it, and Play only fills what is missing.
+    [theme.cssvars.font_main, theme.cssvars.font_main_light].forEach(family => {
+        Object.keys(cyrillicCompanion).forEach(file => {
+            let face = new FontFace(family, `url("${path.join(fontsDir, file).replace(/\\/g, '/')}")`, {unicodeRange: cyrillicCompanion[file]});
+            document.fonts.add(face);
+            // Loaded up front rather than on first use, or the first Russian name to appear
+            // would flash in the system font. A missing file only means that fallback stays.
+            face.load().catch(() => {});
+        });
+    });
 
     document.fonts.add(mainFont);
     document.fonts.load("12px "+theme.cssvars.font_main);
@@ -130,15 +178,13 @@ window._loadTheme = theme => {
 };
 
 function initGraphicalErrorHandling() {
-    window.edexErrorsModals = [];
     window.onerror = (msg, path, line, col, error) => {
         // Error text quotes file names, so escape before it reaches the modal's markup.
-        let errorModal = new Modal({
+        new Modal({
             type: "error",
             title: escapeHtml(error),
             message: `${escapeHtml(msg)}<br/>        at ${escapeHtml(path)}  ${escapeHtml(line)}:${escapeHtml(col)}`
         });
-        window.edexErrorsModals.push(errorModal);
 
         ipc.send("log", "error", `${error}: ${msg}`);
         ipc.send("log", "debug", `at ${path} ${line}:${col}`);
@@ -169,24 +215,16 @@ function waitForFonts() {
 function initSystemInformationProxy() {
     const { nanoid } = require("nanoid/non-secure");
 
+    // A call never rejects. _multithread.js sends no reply when systeminformation fails, so a failed
+    // call just never settles — a .catch() on one of these does nothing.
     window.si = new Proxy({}, {
-        apply: () => {throw new Error("Cannot use sysinfo proxy directly as a function")},
         set: () => {throw new Error("Cannot set a property on the sysinfo proxy")},
-        get: (target, prop, receiver) => {
-            return function(...args) {
-                let callback = (typeof args[args.length - 1] === "function") ? true : false;
-
-                return new Promise((resolve, reject) => {
-                    let id = nanoid();
-                    ipc.once("systeminformation-reply-"+id, (e, res) => {
-                        if (callback) {
-                            args[args.length - 1](res);
-                        }
-                        resolve(res);
-                    });
-                    ipc.send("systeminformation-call", prop, id, ...args);
-                });
-            };
+        get: (target, prop) => {
+            return (...args) => new Promise(resolve => {
+                let id = nanoid();
+                ipc.once("systeminformation-reply-"+id, (e, res) => resolve(res));
+                ipc.send("systeminformation-call", prop, id, ...args);
+            });
         }
     });
 }
@@ -235,6 +273,7 @@ function displayLine() {
     switch(true) {
         case i === 2:
             bootScreen.innerHTML += `EDEX Kernel version ${remote.app.getVersion()} boot at ${Date().toString()}; root:xnu-1699.22.73~1/RELEASE_X86_64`;
+            // falls through: the kernel line gets the same pause as line 4
         case i === 4:
             setTimeout(displayLine, 500);
             break;
@@ -274,61 +313,6 @@ async function bootScreenDone() {
     waitForFonts().then(initUI);
 }
 
-// Show "logo" and background grid
-async function displayTitleScreen() {
-    let bootScreen = document.getElementById("boot_screen");
-    if (bootScreen === null) {
-        bootScreen = document.createElement("section");
-        bootScreen.setAttribute("id", "boot_screen");
-        bootScreen.setAttribute("style", "z-index: 9999999");
-        document.body.appendChild(bootScreen);
-    }
-    bootScreen.innerHTML = "";
-    window.audioManager.theme.play();
-
-    await _delay(400);
-
-    document.body.setAttribute("class", "");
-    bootScreen.setAttribute("class", "center");
-    bootScreen.innerHTML = "<h1>EDEX</h1>";
-    let title = document.querySelector("section > h1");
-
-    await _delay(200);
-
-    document.body.setAttribute("class", "solidBackground");
-
-    await _delay(100);
-
-    title.setAttribute("style", `background-color: rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});border-bottom: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(300);
-
-    title.setAttribute("style", `border: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(100);
-
-    title.setAttribute("style", "");
-    title.setAttribute("class", "glitch");
-
-    await _delay(500);
-
-    document.body.setAttribute("class", "");
-    title.setAttribute("class", "");
-    title.setAttribute("style", `border: 5px solid rgb(${window.theme.r}, ${window.theme.g}, ${window.theme.b});`);
-
-    await _delay(1000);
-    if (window.term) {
-        bootScreen.remove();
-        return true;
-    }
-    initGraphicalErrorHandling();
-    initSystemInformationProxy();
-    waitForFonts().then(() => {
-        bootScreen.remove();
-        initUI();
-    });
-}
-
 // Returns the user's desired display name
 async function getDisplayName() {
     let user = settings.username || null;
@@ -337,52 +321,62 @@ async function getDisplayName() {
 
     try {
         user = await require("username")();
-    } catch (e) {}
+    } catch {}
 
     return user;
 }
 
 // Create the UI's html structure and initialize the terminal client and the keyboard
 async function initUI() {
+    // The terminal frame unfolds from a line into a box, and it has to do so in the spot where
+    // it will stay. It used to unfold alone on the page, propped up by a bottom margin standing
+    // in for the row below; when the filesystem panel and the keyboard were then added, the
+    // layout settled differently and the frame jumped — 24px up and a few sideways, behind a
+    // blink that was meant to hide it.
+    //
+    // Now the bottom row is in the page from the first frame, invisible, so nothing is added
+    // later and nothing reflows. While folded, the frame carries vertical margins of half its
+    // final height (60.3%, see main_shell.css) that shrink as it grows: the space it occupies
+    // stays constant, and it opens evenly from its middle. The margins at the sides are there
+    // for the line break: flex wrapping is greedy, and a frame that is still narrow would share
+    // its line with the filesystem panel and sit off-centre until it grew too wide for that.
+    // None of it survives into the final state, so the resting position does not depend on
+    // these numbers being exact.
+    const shellFolded = "height:0%;margin:30.15vh 30%;";
+
     document.body.innerHTML += `<section class="mod_column" id="mod_column_left">
         <h3 class="title"><p>PANEL</p><p>SYSTEM</p></h3>
     </section>
-    <section id="main_shell" style="height:0%;width:0%;opacity:0;margin-bottom:30vh;" augmented-ui="bl-clip tr-clip exe">
+    <section id="main_shell" style="${shellFolded}width:0%;opacity:0;" augmented-ui="bl-clip tr-clip exe">
         <h3 class="title" style="opacity:0;"><p>TERMINAL</p><p>MAIN SHELL</p></h3>
         <h1 id="main_shell_greeting"></h1>
     </section>
     <section class="mod_column" id="mod_column_right">
         <h3 class="title"><p>PANEL</p><p>NETWORK</p></h3>
-    </section>`;
-
-    await _delay(10);
-
-    window.audioManager.expand.play();
-    document.getElementById("main_shell").setAttribute("style", "height:0%;margin-bottom:30vh;");
-
-    await _delay(500);
-
-    document.getElementById("main_shell").setAttribute("style", "margin-bottom: 30vh;");
-    document.querySelector("#main_shell > h3.title").setAttribute("style", "");
-
-    await _delay(700);
-
-    document.getElementById("main_shell").setAttribute("style", "opacity: 0;");
-    document.body.innerHTML += `
-    <section id="filesystem" style="width: 0px;" class="${window.settings.hideDotfiles ? "hideDotfiles" : ""} ${window.settings.fsListView ? "list-view" : ""}">
+    </section>
+    <section id="filesystem" class="${window.settings.hideDotfiles ? "hideDotfiles" : ""} ${window.settings.fsListView ? "list-view" : ""}">
     </section>
     <section id="keyboard" style="opacity:0;">
     </section>`;
+    // Built now rather than when it is revealed: the bottom row needs its real height from the
+    // first frame, or the frame above would move when the keys arrive.
     window.keyboard = new Keyboard({
-        layout: path.join(keyboardsDir, settings.keyboard+".json"),
+        layout: configFile(keyboardsDir, settings.keyboard, "keyboard layout"),
         container: "keyboard"
     });
 
     await _delay(10);
 
-    document.getElementById("main_shell").setAttribute("style", "");
+    window.audioManager.expand.play();
+    document.getElementById("main_shell").setAttribute("style", shellFolded);
 
-    await _delay(270);
+    await _delay(500);
+
+    document.getElementById("main_shell").setAttribute("style", "");
+    document.querySelector("#main_shell > h3.title").setAttribute("style", "");
+
+    // The frame is in place; hold it for a moment before the greeting and the keyboard.
+    await _delay(980);
 
     let greeter = document.getElementById("main_shell_greeting");
 
@@ -396,7 +390,16 @@ async function initUI() {
 
     greeter.setAttribute("style", "opacity: 1;");
 
-    document.getElementById("filesystem").setAttribute("style", "");
+    // The filesystem panel comes up with the greeting and the keyboard rather than two seconds
+    // later with the side columns. There is no terminal to follow yet, so it is pointed at the
+    // directory the shell starts in, and it stays deaf to clicks until there is a terminal for
+    // them to type into.
+    window.fsDisp = new FilesystemDisplay({
+        parentId: "filesystem"
+    });
+    window.fsDisp.showDir(ipc.sendSync("tty-cwd"));
+    document.getElementById("filesystem").setAttribute("style", "opacity: 1; pointer-events: none;");
+
     document.getElementById("keyboard").setAttribute("style", "");
     document.getElementById("keyboard").setAttribute("class", "animation_state_1");
     window.audioManager.keyboard.play();
@@ -419,6 +422,10 @@ async function initUI() {
 
     // Initialize modules
     window.mods = {};
+
+    // Modules add their markup with insertAdjacentHTML. Six of them used innerHTML +=, which rebuilt
+    // everything already in the column; only this order and the delays before the globe and the
+    // charts draw kept earlier modules' live elements from being thrown away.
 
     // Left column
     window.mods.clock = new Clock("mod_column_left");
@@ -491,13 +498,40 @@ async function initUI() {
     window.onmouseup = e => {
         if (window.keyboard.linkedToTerm) window.term[window.currentTerm].term.focus();
     };
+    // Dropping files anywhere on the window types their paths into the active tab, as
+    // Terminal.app does. Without a dragover handler that calls preventDefault the page is not a
+    // drop target at all, and macOS animates the file flying back to where it came from.
+    window.addEventListener("dragover", e => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    });
+    window.addEventListener("drop", e => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        // A modal owns the keyboard while it is open; typing into the shell behind it would
+        // go unnoticed until the modal is closed.
+        if (!window.keyboard.linkedToTerm) return;
+
+        // File.path is gone from Electron; webUtils is the supported way to the real path. It
+        // comes back empty for files that exist only in memory, such as an image dragged out
+        // of a browser.
+        let paths = Array.from(e.dataTransfer.files)
+            .map(file => electron.webUtils.getPathForFile(file))
+            .filter(filePath => filePath.length > 0);
+        if (paths.length === 0) return;
+
+        let term = window.term[window.currentTerm];
+        // The trailing space lets the next drop, or whatever is typed next, start a new word.
+        term.paste(paths.map(escapePathForPaste).join(" ")+" ");
+        term.term.focus();
+    });
     window.term[0].term.writeln("\033[1m"+`Welcome to EDEX v${remote.app.getVersion()} - Electron v${process.versions.electron}`+"\033[0m");
 
     await _delay(100);
 
-    window.fsDisp = new FilesystemDisplay({
-        parentId: "filesystem"
-    });
+    // The panel has been on screen since the greeting; now it has a terminal to follow.
+    window.fsDisp.followTab();
 
     await _delay(200);
 
@@ -521,15 +555,13 @@ window.themeChanger = theme => {
 window.remakeKeyboard = layout => {
     document.getElementById("keyboard").innerHTML = "";
     window.keyboard = new Keyboard({
-        layout: path.join(keyboardsDir, layout+".json" || settings.keyboard+".json"),
+        layout: configFile(keyboardsDir, layout, "keyboard layout"),
         container: "keyboard"
     });
     ipc.send("setKbOverride", layout);
 };
 
 window.focusShellTab = (number, spawnDir) => {
-    // Tab switch sound disabled
-
     if (number !== window.currentTerm && window.term[number]) {
         window.currentTerm = number;
 
@@ -613,26 +645,32 @@ ipc.on("open-dir-tab", (e, dir) => {
 window.openSettings = async () => {
     if (document.getElementById("settingsEditor")) return;
 
+    // Every value below comes from a file or the system — settings.json is edited by hand, theme
+    // and layout names are file names — and a quote in one used to end the attribute it sat in.
+    // The explicit value attribute keeps what is read back identical to what was written: without
+    // it an option's value is its text with the whitespace collapsed.
+    const option = value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
+
     // Build lists of available keyboards, themes, monitors
-    let keyboards, themes, monitors, ifaces;
+    let keyboards = "", themes = "", monitors = "", ifaces = "";
     fs.readdirSync(keyboardsDir).forEach(kb => {
         if (!kb.endsWith(".json")) return;
         kb = kb.replace(".json", "");
         if (kb === window.settings.keyboard) return;
-        keyboards += `<option>${kb}</option>`;
+        keyboards += option(kb);
     });
     fs.readdirSync(themesDir).forEach(th => {
         if (!th.endsWith(".json")) return;
         th = th.replace(".json", "");
         if (th === window.settings.theme) return;
-        themes += `<option>${th}</option>`;
+        themes += option(th);
     });
     for (let i = 0; i < remote.screen.getAllDisplays().length; i++) {
-        if (i !== window.settings.monitor) monitors += `<option>${i}</option>`;
+        if (i !== window.settings.monitor) monitors += option(i);
     }
     let nets = await window.si.networkInterfaces();
     nets.forEach(net => {
-        if (net.iface !== window.mods.netstat.iface) ifaces += `<option>${net.iface}</option>`;
+        if (net.iface !== window.mods.netstat.iface) ifaces += option(net.iface);
     });
 
     // Unlink the tactile keyboard from the terminal emulator to allow filling in the settings fields
@@ -650,33 +688,33 @@ window.openSettings = async () => {
                     <tr>
                         <td>shell</td>
                         <td>The program to run as a terminal emulator</td>
-                        <td><input type="text" id="settingsEditor-shell" value="${window.settings.shell}"></td>
+                        <td><input type="text" id="settingsEditor-shell" value="${escapeHtml(window.settings.shell)}"></td>
                     </tr>
                     <tr>
                         <td>shellArgs</td>
                         <td>Arguments to pass to the shell</td>
-                        <td><input type="text" id="settingsEditor-shellArgs" value="${window.settings.shellArgs || ''}"></td>
+                        <td><input type="text" id="settingsEditor-shellArgs" value="${escapeHtml(window.settings.shellArgs || '')}"></td>
                     </tr>
                     <tr>
                         <td>cwd</td>
                         <td>Working Directory to start in</td>
-                        <td><input type="text" id="settingsEditor-cwd" value="${window.settings.cwd}"></td>
+                        <td><input type="text" id="settingsEditor-cwd" value="${escapeHtml(window.settings.cwd)}"></td>
                     </tr>
                     <tr>
                         <td>env</td>
-                        <td>Custom shell environment override</td>
-                        <td><input type="text" id="settingsEditor-env" value="${window.settings.env}"></td>
+                        <td>Custom shell environment override, as a JSON object</td>
+                        <td><input type="text" id="settingsEditor-env" value="${escapeHtml(formatEnvSetting(window.settings.env))}"></td>
                     </tr>
                     <tr>
                         <td>username</td>
                         <td>Custom username to display at boot</td>
-                        <td><input type="text" id="settingsEditor-username" value="${window.settings.username}"></td>
+                        <td><input type="text" id="settingsEditor-username" value="${escapeHtml(window.settings.username)}"></td>
                     </tr>
                     <tr>
                         <td>keyboard</td>
                         <td>On-screen keyboard layout code</td>
                         <td><select id="settingsEditor-keyboard">
-                            <option>${window.settings.keyboard}</option>
+                            ${option(window.settings.keyboard)}
                             ${keyboards}
                         </select></td>
                     </tr>
@@ -684,45 +722,45 @@ window.openSettings = async () => {
                         <td>theme</td>
                         <td>Name of the theme to load</td>
                         <td><select id="settingsEditor-theme">
-                            <option>${window.settings.theme}</option>
+                            ${option(window.settings.theme)}
                             ${themes}
                         </select></td>
                     </tr>
                     <tr>
                         <td>termFontSize</td>
                         <td>Size of the terminal text in pixels</td>
-                        <td><input type="number" id="settingsEditor-termFontSize" value="${window.settings.termFontSize}"></td>
+                        <td><input type="number" id="settingsEditor-termFontSize" value="${escapeHtml(window.settings.termFontSize)}"></td>
                     </tr>
                     <tr>
                         <td>audio</td>
                         <td>Activate audio sound effects</td>
                         <td><select id="settingsEditor-audio">
-                            <option>${window.settings.audio}</option>
+                            <option>${escapeHtml(window.settings.audio)}</option>
                             <option>${!window.settings.audio}</option>
                         </select></td>
                     </tr>
                     <tr>
                         <td>audioVolume</td>
                         <td>Set default volume for sound effects (0.0 - 1.0)</td>
-                        <td><input type="number" id="settingsEditor-audioVolume" value="${window.settings.audioVolume || '1.0'}"></td>
+                        <td><input type="number" id="settingsEditor-audioVolume" value="${escapeHtml(window.settings.audioVolume || '1.0')}"></td>
                     </tr>
                     <tr>
                         <td>disableFeedbackAudio</td>
                         <td>Disable recurring feedback sound FX (input/output, mostly)</td>
                         <td><select id="settingsEditor-disableFeedbackAudio">
-                            <option>${window.settings.disableFeedbackAudio}</option>
+                            <option>${escapeHtml(window.settings.disableFeedbackAudio)}</option>
                             <option>${!window.settings.disableFeedbackAudio}</option>
                         </select></td>
                     </tr>
                     <tr>
                         <td>port</td>
                         <td>Preferred local port for the UI-shell connection; a free one is used if it is taken</td>
-                        <td><input type="number" id="settingsEditor-port" value="${window.settings.port}"></td>
+                        <td><input type="number" id="settingsEditor-port" value="${escapeHtml(window.settings.port)}"></td>
                     </tr>
                     <tr>
                         <td>pingAddr</td>
                         <td>IPv4 address to test Internet connectivity</td>
-                        <td><input type="text" id="settingsEditor-pingAddr" value="${window.settings.pingAddr || "1.1.1.1"}"></td>
+                        <td><input type="text" id="settingsEditor-pingAddr" value="${escapeHtml(window.settings.pingAddr || "1.1.1.1")}"></td>
                     </tr>
                     <tr>
                         <td>clockHours</td>
@@ -731,19 +769,20 @@ window.openSettings = async () => {
                             <option>${(window.settings.clockHours === 12) ? "12" : "24"}</option>
                             <option>${(window.settings.clockHours === 12) ? "24" : "12"}</option>
                         </select></td>
+                    </tr>
                     <tr>
                         <td>monitor</td>
                         <td>Which monitor to spawn the UI in (defaults to primary display)</td>
                         <td><select id="settingsEditor-monitor">
-                            ${(typeof window.settings.monitor !== "undefined") ? "<option>"+window.settings.monitor+"</option>" : ""}
+                            ${(typeof window.settings.monitor !== "undefined") ? option(window.settings.monitor) : ""}
                             ${monitors}
                         </select></td>
                     </tr>
                     <tr>
                         <td>nointro</td>
-                        <td>Skip the intro boot log and logo${(window.settings.nointroOverride) ? " (Currently overridden by CLI flag)" : ""}</td>
+                        <td>Skip the intro boot log${(window.settings.nointroOverride) ? " (Currently overridden by CLI flag)" : ""}</td>
                         <td><select id="settingsEditor-nointro">
-                            <option>${window.settings.nointro}</option>
+                            <option>${escapeHtml(window.settings.nointro)}</option>
                             <option>${!window.settings.nointro}</option>
                         </select></td>
                     </tr>
@@ -751,7 +790,7 @@ window.openSettings = async () => {
                         <td>nocursor</td>
                         <td>Hide the mouse cursor${(window.settings.nocursorOverride) ? " (Currently overridden by CLI flag)" : ""}</td>
                         <td><select id="settingsEditor-nocursor">
-                            <option>${window.settings.nocursor}</option>
+                            <option>${escapeHtml(window.settings.nocursor)}</option>
                             <option>${!window.settings.nocursor}</option>
                         </select></td>
                     </tr>
@@ -759,7 +798,7 @@ window.openSettings = async () => {
                         <td>iface</td>
                         <td>Override the interface used for network monitoring</td>
                         <td><select id="settingsEditor-iface">
-                            <option>${window.mods.netstat.iface}</option>
+                            ${option(window.mods.netstat.iface)}
                             ${ifaces}
                         </select></td>
                     </tr>
@@ -767,15 +806,15 @@ window.openSettings = async () => {
                         <td>forceFullscreen</td>
                         <td>Start in native fullscreen instead of a window filling the work area</td>
                         <td><select id="settingsEditor-forceFullscreen">
-                            <option>${window.settings.forceFullscreen}</option>
+                            <option>${escapeHtml(window.settings.forceFullscreen)}</option>
                             <option>${!window.settings.forceFullscreen}</option>
                         </select></td>
                     </tr>
                     <tr>
                         <td>allowWindowed</td>
-                        <td>Allow using F11 key to set the UI in windowed mode</td>
+                        <td>Allow F11 to take the window out of fullscreen</td>
                         <td><select id="settingsEditor-allowWindowed">
-                            <option>${window.settings.allowWindowed}</option>
+                            <option>${escapeHtml(window.settings.allowWindowed)}</option>
                             <option>${!window.settings.allowWindowed}</option>
                         </select></td>
                     </tr>
@@ -789,9 +828,9 @@ window.openSettings = async () => {
                     </tr>
                     <tr>
                         <td>excludeThreadsFromToplist</td>
-                        <td>Display threads in the top processes list</td>
+                        <td>Hide threads from the top processes list</td>
                         <td><select id="settingsEditor-excludeThreadsFromToplist">
-                            <option>${window.settings.excludeThreadsFromToplist}</option>
+                            <option>${escapeHtml(window.settings.excludeThreadsFromToplist)}</option>
                             <option>${!window.settings.excludeThreadsFromToplist}</option>
                         </select></td>
                     </tr>
@@ -799,7 +838,7 @@ window.openSettings = async () => {
                         <td>hideDotfiles</td>
                         <td>Hide files and directories starting with a dot in file display</td>
                         <td><select id="settingsEditor-hideDotfiles">
-                            <option>${window.settings.hideDotfiles}</option>
+                            <option>${escapeHtml(window.settings.hideDotfiles)}</option>
                             <option>${!window.settings.hideDotfiles}</option>
                         </select></td>
                     </tr>
@@ -807,7 +846,7 @@ window.openSettings = async () => {
                         <td>fsListView</td>
                         <td>Show files in a more detailed list instead of an icon grid</td>
                         <td><select id="settingsEditor-fsListView">
-                            <option>${window.settings.fsListView}</option>
+                            <option>${escapeHtml(window.settings.fsListView)}</option>
                             <option>${!window.settings.fsListView}</option>
                         </select></td>
                     </tr>
@@ -815,7 +854,7 @@ window.openSettings = async () => {
                         <td>experimentalGlobeFeatures</td>
                         <td>Toggle experimental features for the network globe</td>
                         <td><select id="settingsEditor-experimentalGlobeFeatures">
-                            <option>${window.settings.experimentalGlobeFeatures}</option>
+                            <option>${escapeHtml(window.settings.experimentalGlobeFeatures)}</option>
                             <option>${!window.settings.experimentalGlobeFeatures}</option>
                         </select></td>
                     </tr>
@@ -823,7 +862,7 @@ window.openSettings = async () => {
                         <td>experimentalFeatures</td>
                         <td>Toggle Chrome's experimental web features (DANGEROUS)</td>
                         <td><select id="settingsEditor-experimentalFeatures">
-                            <option>${window.settings.experimentalFeatures}</option>
+                            <option>${escapeHtml(window.settings.experimentalFeatures)}</option>
                             <option>${!window.settings.experimentalFeatures}</option>
                         </select></td>
                     </tr>
@@ -831,7 +870,7 @@ window.openSettings = async () => {
                 <h6 id="settingsEditorStatus">Loaded values from memory</h6>
                 <br>`,
         buttons: [
-            {label: "Open in External Editor", action:`electron.shell.openPath('${settingsFile}');electronWin.minimize();`},
+            {label: "Open in External Editor", action: "electron.shell.openPath(settingsFile);electronWin.minimize();"},
             {label: "Save to Disk", action: "window.writeSettingsFile()"},
             {label: "Reload UI", action: "window.location.reload(true);"},
             {label: "Restart EDEX", action: "remote.app.relaunch();remote.app.quit();"}
@@ -845,18 +884,20 @@ window.openSettings = async () => {
     });
 };
 
-window.writeFile = (path) => {
-    fs.writeFile(path, document.getElementById("fileEdit").value, "utf-8", () => {
-        document.getElementById("fedit-status").innerHTML = "<i>File saved.</i>";
-    });
-};
-
 window.writeSettingsFile = () => {
+    // env is an object in the file and JSON in the editor. It used to be shown as "[object Object]"
+    // and saved as that string, which then reached the shell as a pile of numbered variables.
+    const env = parseEnvSetting(document.getElementById("settingsEditor-env").value);
+    if (env.error) {
+        document.getElementById("settingsEditorStatus").innerText = `Not saved: ${env.error}`;
+        return;
+    }
+
     window.settings = {
         shell: document.getElementById("settingsEditor-shell").value,
         shellArgs: document.getElementById("settingsEditor-shellArgs").value,
         cwd: document.getElementById("settingsEditor-cwd").value,
-        env: document.getElementById("settingsEditor-env").value,
+        env: env.env,
         username: document.getElementById("settingsEditor-username").value,
         keyboard: document.getElementById("settingsEditor-keyboard").value,
         theme: document.getElementById("settingsEditor-theme").value,
@@ -952,7 +993,7 @@ window.openShortcutsHelp = () => {
 
         appList += `<tr>
                         <td>${(cut.enabled) ? 'YES' : 'NO'}</td>
-                        <td><input disabled type="text" maxlength=25 value="${cut.trigger}"></td>
+                        <td><input disabled type="text" maxlength=25 value="${escapeHtml(cut.trigger)}"></td>
                         <td>${shortcutsDefinition[action]}</td>
                     </tr>`;
     });
@@ -961,9 +1002,9 @@ window.openShortcutsHelp = () => {
     window.shortcuts.filter(e => e.type === "shell").forEach(cut => {
         customList += `<tr>
                             <td>${(cut.enabled) ? 'YES' : 'NO'}</td>
-                            <td><input disabled type="text" maxlength=25 value="${cut.trigger}"></td>
+                            <td><input disabled type="text" maxlength=25 value="${escapeHtml(cut.trigger)}"></td>
                             <td>
-                                <input disabled type="text" placeholder="Run terminal command..." value="${cut.action}">
+                                <input disabled type="text" placeholder="Run terminal command..." value="${escapeHtml(cut.action)}">
                                 <input disabled type="checkbox" name="shortcutsHelpNew_Enter" ${(cut.linebreak) ? 'checked' : ''}>
                                 <label for="shortcutsHelpNew_Enter">Enter</label>
                             </td>
@@ -994,13 +1035,13 @@ window.openShortcutsHelp = () => {
                             <th>Enabled</th>
                             <th>Trigger</th>
                             <th>Command</th>
-                        <tr>
+                        </tr>
                        ${customList}
                     </table>
                 </details>
                 <br>`,
         buttons: [
-            {label: "Open Shortcuts File", action:`electron.shell.openPath('${shortcutsFile}');electronWin.minimize();`},
+            {label: "Open Shortcuts File", action: "electron.shell.openPath(shortcutsFile);electronWin.minimize();"},
             {label: "Reload UI", action: "window.location.reload(true);"},
         ]
     }, () => {
@@ -1077,7 +1118,12 @@ window.useAppShortcut = action => {
             window.openShortcutsHelp();
             return true;
         case "FUZZY_SEARCH":
-            window.activeFuzzyFinder = new FuzzyFinder();
+            // One at a time, and not over the settings editor. The check lived in the constructor,
+            // whose "return false" JavaScript ignores: a second press replaced the open finder
+            // here with an instance that had no window, and Select then threw.
+            if (!document.getElementById("fuzzyFinder") && !document.getElementById("settingsEditor")) {
+                window.activeFuzzyFinder = new FuzzyFinder();
+            }
             return true;
         case "FS_LIST_VIEW":
             window.fsDisp.toggleListview();
