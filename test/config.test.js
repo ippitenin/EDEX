@@ -6,7 +6,8 @@ const {
     mergeMissingSettings,
     mergeMissingShortcuts,
     buildShellEnv,
-    preferredPort
+    preferredPort,
+    parseShellArgs
 } = require("../src/utils/config.js");
 
 const DEFAULTS = {shell: "bash", port: 3000, audio: true, theme: "tron"};
@@ -158,4 +159,20 @@ test("the preferred port falls back to 3000", () => {
     for (const junk of [undefined, null, 0, "", "abc", NaN]) {
         assert.strictEqual(preferredPort(junk), 3000, String(junk));
     }
+});
+
+test("shell arguments from the settings editor become a list", () => {
+    // node-pty throws on a string, which kept the terminal from starting.
+    assert.deepStrictEqual(parseShellArgs("-l"), ["-l"]);
+    assert.deepStrictEqual(parseShellArgs(" -l  -i "), ["-l", "-i"]);
+});
+
+test("no shell arguments means an empty list, so the terminal adds --login itself", () => {
+    for (const empty of ["", "   ", undefined, null, 0]) {
+        assert.deepStrictEqual(parseShellArgs(empty), [], String(empty));
+    }
+});
+
+test("a list of shell arguments written into settings.json by hand passes through", () => {
+    assert.deepStrictEqual(parseShellArgs(["-c", "echo hi"]), ["-c", "echo hi"]);
 });

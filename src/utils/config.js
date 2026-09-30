@@ -67,4 +67,17 @@ function preferredPort(value) {
     return Number(value) || 3000;
 }
 
-module.exports = {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort};
+/**
+ * Turns settings.shellArgs into the list node-pty wants. The settings editor stores a string, and
+ * node-pty refuses a string outright on macOS ("args as a string is not supported on unix") — any
+ * value typed into that field used to stop the terminal from starting at all.
+ *
+ * Arguments are split on whitespace. Quotes are not understood, so no argument can contain a space.
+ */
+function parseShellArgs(value) {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+    return value.split(/\s+/).filter(Boolean);
+}
+
+module.exports = {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort, parseShellArgs};

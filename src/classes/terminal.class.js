@@ -328,7 +328,7 @@ class Terminal {
             this._closed = false;
             this.onclosed = () => {};
             this.onopened = () => {};
-            this.onresize = () => {};
+            this.onresized = () => {};
             this.ondisconnected = () => {};
 
             this._disableCWDtracking = false;
@@ -465,7 +465,8 @@ class Terminal {
                     return this._isAllowedOrigin(info.origin);
                 }
             });
-            this.Ipc.on("terminal_channel-"+this.port, (e, ...args) => {
+            this._channel = "terminal_channel-"+this.port;
+            this._onChannel = (e, ...args) => {
                 switch(args[0]) {
                     case "Renderer startup":
                         this.renderer = e.sender;
@@ -489,7 +490,8 @@ class Terminal {
                     default:
                         return;
                 }
-            });
+            };
+            this.Ipc.on(this._channel, this._onChannel);
             this.wss.on("connection", ws => {
                 this.onopened(this.tty._pid);
                 ws.on("close", (code, reason) => {
@@ -513,8 +515,17 @@ class Terminal {
             // The main process asks when a tab opens or the filesystem panel needs somewhere to start.
             this.getCwd = () => this.tty._cwd;
 
+            // Closing takes down everything the terminal holds, not just the shell. The tick and the
+            // channel listener used to outlive a closed tab, and the next tab on the same port heard
+            // the dead one's "New cwd". _closed is not enough of a guard: onExit sets it too.
+            this._disposed = false;
             this.close = () => {
+                if (this._disposed) return;
+                this._disposed = true;
+                clearInterval(this._tick);
+                this.Ipc.removeListener(this._channel, this._onChannel);
                 this.tty.kill();
+                this.wss.close();
                 this._closed = true;
             };
         } else {

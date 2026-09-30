@@ -9,13 +9,18 @@ const remoteMain = require("@electron/remote/main");
 const Terminal = require("./classes/terminal.class.js").Terminal;
 const {findFreePort} = require("./utils/net.js");
 const {extractDirFromArgv, pickStartDisplay, resolveSpawnCwd, firstFreeSlot} = require("./utils/system.js");
-const {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort} = require("./utils/config.js");
+const {mergeMissingSettings, mergeMissingShortcuts, buildShellEnv, preferredPort, parseShellArgs} = require("./utils/config.js");
 
 // Declared ahead of everything that can throw: the crash handler below reads them, and a let still
 // in its temporal dead zone would turn the crash report itself into a ReferenceError.
 let win = null;
 let tty = null;
 let extraTtys = null;
+
+// A tab slot is claimed before the await in spawnExtraTty, so two tabs opened at once cannot take
+// the same one. The marker has no close(): anything that walks the slots has to step over it.
+const RESERVED = Symbol("reserved tab slot");
+let quitting = false;
 
 // Keep config under EDEX; migrate from the historical eDEX-UI folder if present. This runs before
 // the single-instance lock, whose files live in userData — the folder has to be settled first.
@@ -33,23 +38,25 @@ function useUserDataDir() {
 }
 useUserDataDir();
 
-function closeExtraTtys() {
-    Object.keys(extraTtys).forEach(key => {
-        if (extraTtys[key] !== null) {
-            extraTtys[key].close();
+// Closes every shell there is, whatever point start-up or a tab had reached — quitting before the
+// main terminal existed used to crash on the way out. One shell refusing to close must not keep
+// the others alive.
+function closeAllTtys() {
+    for (const term of [tty, ...Object.values(extraTtys || {})]) {
+        if (!term || term === RESERVED) continue;
+        try {
+            term.close();
+        } catch (err) {
+            signale.warn("Could not close a terminal:", err.message);
         }
-    });
+    }
 }
 
+// Nothing in here may throw: an exception inside the handler would skip process.exit.
 function fatal(e) {
     signale.fatal(e);
-    dialog.showErrorBox("EDEX crashed", e.message || "Cannot retrieve error message.");
-    if (tty) {
-        tty.close();
-    }
-    if (extraTtys) {
-        closeExtraTtys();
-    }
+    dialog.showErrorBox("EDEX crashed", (e && e.message) || "Cannot retrieve error message.");
+    closeAllTtys();
     process.exit(1);
 }
 process.on("uncaughtException", fatal);
@@ -297,7 +304,7 @@ function startTty(settings, env, cwd, port) {
     return new Terminal({
         role: "server",
         shell: settings.shell,
-        params: settings.shellArgs || '',
+        params: parseShellArgs(settings.shellArgs),
         cwd,
         env,
         port
@@ -337,7 +344,7 @@ async function spawnExtraTty(e, arg, settings, env) {
         e.sender.send("ttyspawn-reply", "ERROR: max number of ttys reached");
         return;
     }
-    extraTtys[slot] = {};
+    extraTtys[slot] = RESERVED;
 
     // A dev server can hold the slot's port just as it can hold the main one.
     let port;
@@ -350,29 +357,46 @@ async function spawnExtraTty(e, arg, settings, env) {
         return;
     }
 
-    signale.pending(`Creating new TTY process on port ${port}`);
-    let term = startTty(settings, env, resolveSpawnCwd(arg, tty.getCwd(), settings.cwd), port);
+    // The app started quitting while the port was being looked for, and before-quit has already
+    // closed every shell it knew of. One started now would outlive the app.
+    if (quitting) {
+        extraTtys[slot] = null;
+        return;
+    }
+
+    let term;
+    try {
+        signale.pending(`Creating new TTY process on port ${port}`);
+        term = startTty(settings, env, resolveSpawnCwd(arg, tty.getCwd(), settings.cwd), port);
+    } catch (err) {
+        // Without this the slot stayed reserved for good and the tab sat on LOADING forever.
+        signale.error(`TTY ${port} could not start:`, err.message);
+        extraTtys[slot] = null;
+        e.sender.send("ttyspawn-reply", "ERROR: "+err.message);
+        return;
+    }
     signale.success(`New terminal back-end initialized at ${port}`);
 
-    const release = () => {
-        term.wss.close();
-        extraTtys[slot] = null;
-        term = null;
+    // A tab ends one of three ways — its shell exits, its renderer goes away, or its socket never
+    // opens — and each has to take down both the shell and the socket, exactly once. The socket
+    // error used to free the slot and leave the shell running with nothing attached to it.
+    let ended = false;
+    const end = () => {
+        if (ended) return;
+        ended = true;
+        term.onclosed = () => {};
+        term.ondisconnected = () => {};
+        term.close();
+        if (extraTtys[slot] === term) extraTtys[slot] = null;
     };
     term.onclosed = (code, signal) => {
-        term.ondisconnected = () => {};
         signale.complete(`TTY exited at ${port}`, code, signal);
-        release();
+        end();
     };
     term.onopened = pid => {
         signale.success(`TTY ${port} connected to frontend (process PID ${pid})`);
     };
-    term.onresized = () => {};
-    term.ondisconnected = () => {
-        term.onclosed = () => {};
-        term.close();
-        release();
-    };
+    term.ondisconnected = end;
 
     extraTtys[slot] = term;
 
@@ -394,7 +418,7 @@ async function spawnExtraTty(e, arg, settings, env) {
 
     term.wss.once("error", err => {
         signale.error(`TTY ${port} could not open its socket:`, err.message);
-        if (extraTtys[slot] === term) extraTtys[slot] = null;
+        end();
         reply("ERROR: "+err.message);
     });
 }
@@ -415,7 +439,9 @@ function registerIpc(settings, env) {
 
     // Support for more terminals, used for creating tabs (currently limited to 4 extra terms)
     extraTtys = {};
-    const basePort = Number(settings.port || 3000) + 2;
+    // Same reading of the setting as the main port: a value that is not a number used to put all
+    // four slots under one "NaN" key, leaving room for a single extra tab.
+    const basePort = preferredPort(settings.port) + 2;
     for (let i = 0; i < 4; i++) {
         extraTtys[basePort+i] = null;
     }
@@ -486,7 +512,11 @@ async function onReady() {
     createWindow(settings);
 }
 
-app.on('ready', onReady);
+// An async listener's rejection is not an uncaught exception: a missing shell or start directory
+// left the app running with no window and no word of what went wrong.
+app.on('ready', () => {
+    onReady().catch(fatal);
+});
 
 app.on('web-contents-created', (e, contents) => {
     // Prevent creating more than one window
@@ -507,7 +537,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-    tty.close();
-    closeExtraTtys();
+    quitting = true;
+    closeAllTtys();
     signale.complete("Shutting down...");
 });
