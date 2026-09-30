@@ -84,6 +84,8 @@ A dev server on port 3000 used to crash EDEX on launch with `EADDRINUSE`.
 
 - [ ] Follows the terminal: `cd` somewhere and the listing changes with it
 - [ ] Click a folder to enter it, `..` to go back
+- [ ] The listing is complete: count the entries of a busy folder against `ls -A | wc -l` (plus
+      the two navigation tiles) — the panel used to drop one or two on most reads
 - [ ] Disk usage bar shows a mount name and a percentage
 - [ ] `cd` into a deeply nested folder — the path in the title bar stays inside the panel: shown
       whole while it fits between the FILESYSTEM label and the right edge, with `/…/` in place of

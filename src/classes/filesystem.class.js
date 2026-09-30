@@ -248,60 +248,58 @@ class FilesystemDisplay {
 
             this.cwd = [];
 
-            await new Promise((resolve, reject) => {
-                if (content.length === 0) resolve();
+            // Every entry is stat'ed at once and the listing waits for all of them. It used to wait
+            // for the one that happened to be last in the directory, so any entry whose lstat
+            // came back after that one was silently left out of the panel.
+            await Promise.all(content.map(async file => {
+                let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
+                    if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
+                        throw e;
+                    }
+                });
 
-                content.forEach(async (file, i) => {
-                    let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
-                        if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
-                            reject();
-                        }
-                    });
+                let e = {
+                    name: window._escapeHtml(file),
+                    path: path.resolve(tcwd, file),
+                    type: "other",
+                    category: "other",
+                    hidden: false
+                };
 
-                    let e = {
-                        name: window._escapeHtml(file),
-                        path: path.resolve(tcwd, file),
-                        type: "other",
-                        category: "other",
-                        hidden: false
-                    };
+                if (typeof fstat !== "undefined") {
+                    e.lastAccessed = fstat.mtime.getTime();
 
-                    if (typeof fstat !== "undefined") {
-                        e.lastAccessed = fstat.mtime.getTime();
+                    if (fstat.isDirectory()) {
+                        e.category = "dir";
+                        e.type = "dir";
+                    }
+                    if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
+                    if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
 
-                        if (fstat.isDirectory()) {
-                            e.category = "dir";
-                            e.type = "dir";
-                        }
-                        if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
-                        if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
-
-                        if (fstat.isSymbolicLink()) {
-                            e.category = "symlink";
-                            e.type = "symlink";
-                        }
-
-                        if (fstat.isFile()) {
-                            e.category = "file";
-                            e.type = "file";
-                            e.size = fstat.size;
-                        }
-                    } else {
-                        e.type = "system";
-                        e.hidden = true;
+                    if (fstat.isSymbolicLink()) {
+                        e.category = "symlink";
+                        e.type = "symlink";
                     }
 
-                    if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
-                    if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
-                    if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
-                    if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
+                    if (fstat.isFile()) {
+                        e.category = "file";
+                        e.type = "file";
+                        e.size = fstat.size;
+                    }
+                } else {
+                    e.type = "system";
+                    e.hidden = true;
+                }
 
-                    if (file.startsWith(".")) e.hidden = true;
+                if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
+                if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
+                if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
+                if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
 
-                    this.cwd.push(e);
-                    if (i === content.length-1) resolve();
-                });
-            }).catch(() => { this.setFailedState() });
+                if (file.startsWith(".")) e.hidden = true;
+
+                this.cwd.push(e);
+            })).catch(() => { this.setFailedState() });
 
             if (this.failed) return false;
 
