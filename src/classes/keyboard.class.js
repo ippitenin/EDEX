@@ -44,7 +44,13 @@ class Keyboard {
             });
 
             let cat = mods.join("");
-            
+            // Only combinations of Ctrl, Alt and Shift exist. Anything else in shortcuts.json — a
+            // bare key, "Cmd+K", a typo — used to throw here and take the whole keyboard with it.
+            if (!Object.prototype.hasOwnProperty.call(this._shortcuts, cat)) {
+                console.warn(`Ignoring the shortcut "${scut.trigger}": only Ctrl, Alt and Shift can be combined`);
+                return;
+            }
+
             if (cut.type === "app" && cut.action === "TAB_X" && cut.trigger === "X") {
                 for (let i = 1; i <= 5; i++) {
                     let ncut = Object.assign({}, cut);

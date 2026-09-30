@@ -54,7 +54,6 @@ class FilesystemDisplay {
         };
         this.fsBlock = {};
         this.dirpath = "";
-        this.failed = false;
         this._noTracking = false;
         this._runNextTick = false;
         this._reading = false;
@@ -129,13 +128,6 @@ class FilesystemDisplay {
                 return false;
             }
         });
-
-        this.setFailedState = () => {
-            this.failed = true;
-            container.innerHTML = `
-            <h3 class="title"><p>FILESYSTEM</p><p id="fs_disp_title_dir">EXECUTION FAILED</p></h3>
-            <h2 id="fs_disp_error">CANNOT ACCESS CURRENT WORKING DIRECTORY</h2>`;
-        };
 
         this.followTab = () => {
             // Don't follow tabs when running in detached mode, see #432
@@ -218,10 +210,20 @@ class FilesystemDisplay {
             }
         };
 
+        // A read that failed used to leave the panel dead for the rest of the session: _reading
+        // stayed set, or the failed state had replaced the panel's markup — the title and the disk
+        // bar with it — and every later read returned straight away.
         this.readFS = async dir => {
-            if (this.failed === true || this._reading) return false;
+            if (this._reading) return false;
             this._reading = true;
+            try {
+                return await this._readFS(dir);
+            } finally {
+                this._reading = false;
+            }
+        };
 
+        this._readFS = async dir => {
             this.filesContainer.setAttribute("class", "");
             this.filesContainer.innerHTML = "";
             if (this._noTracking) {
@@ -232,17 +234,21 @@ class FilesystemDisplay {
 
             if (process.platform === "win32" && dir.endsWith(":")) dir = dir+"\\";
             let tcwd = dir;
-            let content = await this._asyncFSwrapper.readdir(tcwd).catch(err => {
+            let content;
+            try {
+                content = await this._asyncFSwrapper.readdir(tcwd);
+            } catch (err) {
                 console.warn(err);
-                if (this._noTracking === true && this.dirpath) { // #262
-                    this.setFailedState();
+                // In place of the listing, so the panel recovers as soon as the shell moves on.
+                this.filesContainer.innerHTML = `<h2 id="fs_disp_error">CANNOT ACCESS ${window._escapeHtml(tcwd)}</h2>`;
+                // Detached from the terminal nothing else will move it, so go back. See #262.
+                if (this._noTracking === true && this.dirpath && this.dirpath !== tcwd) {
                     setTimeout(() => {
                         this.readFS(this.dirpath);
                     }, 1000);
-                } else {
-                    this.setFailedState();
                 }
-            });
+                return false;
+            }
 
             this.reCalculateDiskUsage(tcwd);
 
@@ -252,11 +258,15 @@ class FilesystemDisplay {
             // for the one that happened to be last in the directory, so any entry whose lstat
             // came back after that one was silently left out of the panel.
             await Promise.all(content.map(async file => {
-                let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
-                    if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
-                        throw e;
-                    }
-                });
+                let fstat;
+                try {
+                    fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file));
+                } catch (err) {
+                    // Deleted between readdir and lstat — a swap file, a lock file, npm at work.
+                    // That used to put the whole panel into its failed state for good.
+                    if (err.code === "ENOENT") return;
+                    // Anything else unreadable is listed as a system entry, as EPERM and EBUSY were.
+                }
 
                 // The raw name: it is escaped where it meets markup and quoted where it meets the
                 // shell. Storing it pre-escaped made a folder called R&D come out as cd "R&amp;D".
@@ -301,9 +311,7 @@ class FilesystemDisplay {
                 if (file.startsWith(".")) e.hidden = true;
 
                 this.cwd.push(e);
-            })).catch(() => { this.setFailedState() });
-
-            if (this.failed) return false;
+            }));
 
             let ordering = {
                 dir: 0,
@@ -330,12 +338,9 @@ class FilesystemDisplay {
 
             this.dirpath = tcwd;
             this.render(this.cwd);
-            this._reading = false;
         };
 
         this.readDevices = async () => {
-            if (this.failed === true) return false;
-
             let blocks = await window.si.blockDevices();
             let devices = [];
             blocks.forEach(block => {
@@ -359,8 +364,6 @@ class FilesystemDisplay {
         this.render = async (originBlockList, isDiskView) => {
             // Work on a clone of the blocklist to avoid altering fsDisp.cwd
             let blockList = JSON.parse(JSON.stringify(originBlockList));
-
-            if (this.failed === true) return false;
 
             if (isDiskView) {
                 this.filesContainer.setAttribute("class", "disks");
@@ -683,13 +686,17 @@ class FilesystemDisplay {
                     if (mime.charset(filetype) === "UTF-8") {
                         fs.readFile(block.path, 'utf-8', (err, data) => {
                             if (err) {
+                                // message, not html: an info modal ignores html and showed its
+                                // placeholder text. And no editor after it — it opened on the text
+                                // "undefined", and Save wrote that over the file.
                                 new Modal({
                                     type: "info",
                                     title: "Failed to load file: " + window._escapeHtml(block.path),
-                                    html: window._escapeHtml(err)
+                                    message: window._escapeHtml(err.message)
                                 });
                                 console.log(err);
-                            };
+                                return;
+                            }
                             window.keyboard.detach();
                             // The path stays in this closure rather than in an onclick string, where
                             // a quote in the file name broke out of it. Each editor saves its own

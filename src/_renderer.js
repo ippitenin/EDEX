@@ -1163,7 +1163,12 @@ window.useAppShortcut = action => {
             window.openShortcutsHelp();
             return true;
         case "FUZZY_SEARCH":
-            window.activeFuzzyFinder = new FuzzyFinder();
+            // One at a time, and not over the settings editor. The check lived in the constructor,
+            // whose "return false" JavaScript ignores: a second press replaced the open finder
+            // here with an instance that had no window, and Select then threw.
+            if (!document.getElementById("fuzzyFinder") && !document.getElementById("settingsEditor")) {
+                window.activeFuzzyFinder = new FuzzyFinder();
+            }
             return true;
         case "FS_LIST_VIEW":
             window.fsDisp.toggleListview();

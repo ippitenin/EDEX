@@ -64,6 +64,16 @@ div#fs_disp_container > * {
     transition: opacity .2s linear;
 }
 
+/* An unreadable directory: the message stands in for the listing, across the whole grid rather
+   than squeezed into one tile. */
+div#fs_disp_container > h2#fs_disp_error {
+    grid-column: 1 / -1;
+    width: auto;
+    height: auto;
+    padding-top: 8vh;
+    cursor: default;
+}
+
 div#fs_disp_container > *.animationWait {
     opacity: 0 !important;
 }
