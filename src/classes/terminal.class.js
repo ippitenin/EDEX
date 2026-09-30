@@ -509,6 +509,10 @@ class Terminal {
                 });
             });
 
+            // The shell's directory as the tick above last saw it; undefined until it reports one.
+            // The main process asks when a tab opens or the filesystem panel needs somewhere to start.
+            this.getCwd = () => this.tty._cwd;
+
             this.close = () => {
                 this.tty.kill();
                 this._closed = true;
