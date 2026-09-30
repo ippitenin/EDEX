@@ -19,6 +19,10 @@ a terminal session, or the shell inherits that session's environment.
 
 - [ ] Boot log scrolls, then the interface appears without the glitch title screen
 - [ ] No error dialog on launch
+- [ ] The terminal frame grows from a line into a box around its own middle and then stays put —
+      no blink, no step sideways or upwards when the greeting and the keyboard appear
+- [ ] The keyboard fades in where it stands, row after row; the keys do not travel across the
+      screen and nothing snaps into place at the end
 - [ ] Window fills the work area with a title bar; close, minimise and zoom buttons are there
 - [ ] Keyboard rows, Enter and spacebar line up, nothing overflows
 - [ ] Window drags by its title bar and resizes; leaving fullscreen does not shrink it to a stamp
