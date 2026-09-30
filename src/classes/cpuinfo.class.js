@@ -125,7 +125,9 @@ class Cpuinfo {
         window.si.currentLoad().then(data => {
             let average = [[], []];
 
-            if (!data.cpus) return; // Prevent memleak in rare case where systeminformation takes extra time to retrieve CPU info (see github issue #216)
+            // systeminformation can answer before it has per-core figures (upstream #216). Note that
+            // returning here leaves updatingCPUload set, which stops the graphs — see AUDIT.md.
+            if (!data.cpus) return;
 
             data.cpus.forEach((e, i) => {
                 this.series[i].append(new Date().getTime(), e.load);
@@ -141,7 +143,7 @@ class Cpuinfo {
 
                 try {
                     document.getElementById(`mod_cpuinfo_usagecounter${i}`).innerText = `Avg. ${average[i]}%`;
-                } catch(e) {
+                } catch {
                     // Fail silently, DOM element is probably getting refreshed (new theme, etc)
                 }
             });
@@ -152,7 +154,7 @@ class Cpuinfo {
         window.si.cpuTemperature().then(data => {
             try {
                 document.getElementById("mod_cpuinfo_temp").innerText = `${data.max}°C`;
-            } catch(e) {
+            } catch {
                 // See above notice
             }
         });
@@ -164,7 +166,7 @@ class Cpuinfo {
             try {
                 document.getElementById("mod_cpuinfo_speed_min").innerText = `${data.speed}GHz`;
                 document.getElementById("mod_cpuinfo_speed_max").innerText = `${data.speedMax}GHz`;
-            } catch(e) {
+            } catch {
                 // See above notice
             }
             this.updatingCPUspeed = false;
@@ -176,7 +178,7 @@ class Cpuinfo {
         window.si.processes().then(data => {
             try {
                 document.getElementById("mod_cpuinfo_tasks").innerText = `${data.all}`;
-            } catch(e) {
+            } catch {
                 // See above notice
             }
             this.updatingCPUtasks = false;

@@ -273,6 +273,7 @@ function displayLine() {
     switch(true) {
         case i === 2:
             bootScreen.innerHTML += `EDEX Kernel version ${remote.app.getVersion()} boot at ${Date().toString()}; root:xnu-1699.22.73~1/RELEASE_X86_64`;
+            // falls through: the kernel line gets the same pause as line 4
         case i === 4:
             setTimeout(displayLine, 500);
             break;
@@ -320,7 +321,7 @@ async function getDisplayName() {
 
     try {
         user = await require("username")();
-    } catch (e) {}
+    } catch {}
 
     return user;
 }
@@ -561,8 +562,6 @@ window.remakeKeyboard = layout => {
 };
 
 window.focusShellTab = (number, spawnDir) => {
-    // Tab switch sound disabled
-
     if (number !== window.currentTerm && window.term[number]) {
         window.currentTerm = number;
 
@@ -770,6 +769,7 @@ window.openSettings = async () => {
                             <option>${(window.settings.clockHours === 12) ? "12" : "24"}</option>
                             <option>${(window.settings.clockHours === 12) ? "24" : "12"}</option>
                         </select></td>
+                    </tr>
                     <tr>
                         <td>monitor</td>
                         <td>Which monitor to spawn the UI in (defaults to primary display)</td>
@@ -1035,7 +1035,7 @@ window.openShortcutsHelp = () => {
                             <th>Enabled</th>
                             <th>Trigger</th>
                             <th>Command</th>
-                        <tr>
+                        </tr>
                        ${customList}
                     </table>
                 </details>

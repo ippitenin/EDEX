@@ -41,7 +41,8 @@ class Conninfo {
                 precision: 2
             }
         }];
-        chartOptions.push(Object.assign({}, chartOptions[0]));  // Deep copy object, see http://jsben.ch/bWfk9
+        // A shallow copy is enough: the two charts differ only in the top-level min and max below.
+        chartOptions.push(Object.assign({}, chartOptions[0]));
         chartOptions[0].minValue = 0;
         chartOptions[1].maxValue = 0;
 

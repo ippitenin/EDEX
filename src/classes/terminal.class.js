@@ -247,7 +247,6 @@ class Terminal {
                 let d = gcd(w, h);
 
                 if (d === 100) { y = 1; x = 3;}
-                // if (d === 120) y = 1;
                 if (d === 256) x = 2;
 
                 if (window.settings.termFontSize < 15) y = y - 1;
@@ -393,7 +392,7 @@ class Terminal {
                             this._disableCWDtracking = true;
                             try {
                                 this.renderer.send("terminal_channel-"+this.port, "Fallback cwd", opts.cwd || process.env.PWD);
-                            } catch(e) {
+                            } catch {
                                 // renderer closed
                             }
                         }
@@ -413,7 +412,7 @@ class Terminal {
                             console.log("Error while retrieving TTY subprocess: ", e);
                             try {
                                 this.renderer.send("terminal_channel-"+this.port, "New process", "");
-                            } catch(e) {
+                            } catch {
                                 // renderer closed
                             }
                         }
@@ -466,7 +465,7 @@ class Terminal {
                         let rows = args[2];
                         try {
                             this.tty.resize(Number(cols), Number(rows));
-                        } catch (error) {
+                        } catch {
                             //Keep going, it'll work anyways.
                         }
                         this.onresized(cols, rows);
@@ -489,7 +488,7 @@ class Terminal {
                     this._nextTickUpdateProcess = true;
                     try {
                         ws.send(data);
-                    } catch (e) {
+                    } catch {
                         // Websocket closed
                     }
                 });

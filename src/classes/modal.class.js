@@ -114,7 +114,6 @@ class Modal {
             this.focus();
         });
 
-        // Modal open/close sounds disabled
         window.modals[this.id] = this;
         document.body.appendChild(element);
         this.focus();

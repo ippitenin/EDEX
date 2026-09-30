@@ -419,7 +419,7 @@ class FilesystemDisplay {
                 }
 
                 if (e.type === "up") {
-                    // cmd is OS-specific and defined above
+                    // cmd is set above; going up has no Ctrl or Shift variant
                     cmdPrefix = '';
                     cmdSuffix = '';
                 }
@@ -550,7 +550,6 @@ class FilesystemDisplay {
                 e.setAttribute("class", e.className.replace(" animationWait", ""));
 
                 if (window.settings.hideDotfiles !== true || e.className.indexOf("hidden") === -1) {
-                    // Filesystem refresh sound disabled
                     await _delay(30);
                 }
 

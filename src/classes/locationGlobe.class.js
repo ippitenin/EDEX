@@ -106,8 +106,8 @@ class LocationGlobe {
 
             // Add random satellites
             let constellation = [];
-            for(var i = 0; i< 2; i++){
-                for(var j = 0; j< 3; j++){
+            for (let i = 0; i < 2; i++) {
+                for (let j = 0; j < 3; j++) {
                     constellation.push({
                         lat: 50 * i - 30 + 15 * Math.random(),
                         lon: 120 * j - 120 + 30 * i,

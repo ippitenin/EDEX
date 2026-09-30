@@ -23,7 +23,7 @@ function extractDirFromArgv(argv, fsImpl = fs) {
         if (typeof arg !== "string" || arg.startsWith("-") || !path.isAbsolute(arg)) continue;
         try {
             if (fsImpl.statSync(arg).isDirectory()) return arg;
-        } catch (e) {
+        } catch {
             // Not a directory, or gone — keep looking.
         }
     }

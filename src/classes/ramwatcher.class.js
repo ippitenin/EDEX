@@ -9,7 +9,7 @@ class RAMwatcher {
                 <h1>MEMORY<i id="mod_ramwatcher_info"></i></h1>
                 <div id="mod_ramwatcher_pointmap">`;
 
-        for (var i = 0; i < 440; i++) {
+        for (let i = 0; i < 440; i++) {
             ramwatcherDOM += `<div class="mod_ramwatcher_point free"></div>`;
         }
 
