@@ -3,12 +3,15 @@ window.eval = global.eval = function () {
     throw new Error("eval() is disabled for security reasons.");
 };
 // Security helpers — implementations and their tests live in utils/sanitize.js
-const {escapeHtml, purifyCSS, quoteForShell} = require("./utils/sanitize.js");
+const {escapeHtml, purifyCSS, quoteForShell, escapePathForPaste} = require("./utils/sanitize.js");
 // Window helpers — same story, see utils/system.js
 const {pickNextDisplay} = require("./utils/system.js");
+// Which physical key each slot of the on-screen keyboard stands for, see utils/keyboard.js
+const {codeForKeySlot} = require("./utils/keyboard.js");
 window._escapeHtml = escapeHtml;
 window._purifyCSS = purifyCSS;
 window._quoteForShell = quoteForShell;
+window._codeForKeySlot = codeForKeySlot;
 window._encodePathURI = uri => {
     return encodeURI(uri).replace(/#/g, "%23");
 };
@@ -491,6 +494,34 @@ async function initUI() {
     window.onmouseup = e => {
         if (window.keyboard.linkedToTerm) window.term[window.currentTerm].term.focus();
     };
+    // Dropping files anywhere on the window types their paths into the active tab, as
+    // Terminal.app does. Without a dragover handler that calls preventDefault the page is not a
+    // drop target at all, and macOS animates the file flying back to where it came from.
+    window.addEventListener("dragover", e => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    });
+    window.addEventListener("drop", e => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        // A modal owns the keyboard while it is open; typing into the shell behind it would
+        // go unnoticed until the modal is closed.
+        if (!window.keyboard.linkedToTerm) return;
+
+        // File.path is gone from Electron; webUtils is the supported way to the real path. It
+        // comes back empty for files that exist only in memory, such as an image dragged out
+        // of a browser.
+        let paths = Array.from(e.dataTransfer.files)
+            .map(file => electron.webUtils.getPathForFile(file))
+            .filter(filePath => filePath.length > 0);
+        if (paths.length === 0) return;
+
+        let term = window.term[window.currentTerm];
+        // The trailing space lets the next drop, or whatever is typed next, start a new word.
+        term.paste(paths.map(escapePathForPaste).join(" ")+" ");
+        term.term.focus();
+    });
     window.term[0].term.writeln("\033[1m"+`Welcome to EDEX v${remote.app.getVersion()} - Electron v${process.versions.electron}`+"\033[0m");
 
     await _delay(100);

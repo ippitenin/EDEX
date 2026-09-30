@@ -288,6 +288,13 @@ class Terminal {
                 this.socket.send(cmd+"\r");
             };
 
+            // Unlike write, this goes through xterm, which wraps the text in bracketed-paste
+            // markers when the running program has asked for them. That is how a program tells
+            // a paste from typing — and the only way Claude Code notices a dropped image path.
+            this.paste = text => {
+                this.term.paste(text);
+            };
+
             this.clipboard = {
                 copy: () => {
                     if (!this.term.hasSelection()) return false;

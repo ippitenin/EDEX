@@ -34,6 +34,27 @@ a terminal session, or the shell inherits that session's environment.
 - [ ] Tab title shows the running process (run `top`, then quit it)
 - [ ] Copy and paste through the app shortcuts
 
+## On-screen keyboard
+
+Keys used to light up only when the character typed existed in the on-screen layout, so under a
+Russian input source the letters stayed dark.
+
+- [ ] Type with an English input source — every key lights up under its own label
+- [ ] Switch macOS to Russian and type letters, digits and punctuation — the key in the same
+      physical position lights up, with and without Shift
+- [ ] Space, Enter, Backspace, arrows and the modifiers still light up in both
+
+## Dropping files
+
+- [ ] Drag a file from Finder onto the window at a shell prompt — its path is typed in, escaped
+      with backslashes and followed by a space; nothing runs
+- [ ] Drop two files at once — two paths, separated by a space
+- [ ] Drop a file whose name has a space, an apostrophe and Cyrillic, then press Enter after
+      `ls -l ` — the shell finds it
+- [ ] Inside `claude`, drop an image — it becomes `[Image #1]`; drop two — `#1` and `#2`
+- [ ] Drag the thumbnail of a fresh screenshot in — same result
+- [ ] Open settings and drop a file — nothing appears in the terminal behind the modal
+
 ## Tabs
 
 - [ ] Click each of the four EMPTY tabs in turn — every one opens a working shell
