@@ -143,6 +143,10 @@ class FilesystemDisplay {
 
             let num = window.currentTerm;
 
+            // At startup the panel exists before the terminal does; initUI calls back in once
+            // there is a tab to follow.
+            if (!window.term || !window.term[num]) return false;
+
             window.term[num].oncwdchange = cwd => {
                 // See #501
                 if (this._noTracking) return false;
@@ -163,6 +167,15 @@ class FilesystemDisplay {
             };
         };
         this.followTab();
+
+        // Shows a directory without waiting for a terminal to report it — the startup case,
+        // where the panel appears together with the keyboard. Recording it as the tracked path
+        // is what stops the terminal's first report of the same directory from redrawing it.
+        this.showDir = dir => {
+            this.cwd_path = dir;
+            this.readFS(dir);
+            this.watchFS(dir);
+        };
 
         this.watchFS = dir => {
             if (this._fsWatcher) {
@@ -235,60 +248,58 @@ class FilesystemDisplay {
 
             this.cwd = [];
 
-            await new Promise((resolve, reject) => {
-                if (content.length === 0) resolve();
+            // Every entry is stat'ed at once and the listing waits for all of them. It used to wait
+            // for the one that happened to be last in the directory, so any entry whose lstat
+            // came back after that one was silently left out of the panel.
+            await Promise.all(content.map(async file => {
+                let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
+                    if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
+                        throw e;
+                    }
+                });
 
-                content.forEach(async (file, i) => {
-                    let fstat = await this._asyncFSwrapper.lstat(path.join(tcwd, file)).catch(e => {
-                        if (!e.message.includes("EPERM") && !e.message.includes("EBUSY")) {
-                            reject();
-                        }
-                    });
+                let e = {
+                    name: window._escapeHtml(file),
+                    path: path.resolve(tcwd, file),
+                    type: "other",
+                    category: "other",
+                    hidden: false
+                };
 
-                    let e = {
-                        name: window._escapeHtml(file),
-                        path: path.resolve(tcwd, file),
-                        type: "other",
-                        category: "other",
-                        hidden: false
-                    };
+                if (typeof fstat !== "undefined") {
+                    e.lastAccessed = fstat.mtime.getTime();
 
-                    if (typeof fstat !== "undefined") {
-                        e.lastAccessed = fstat.mtime.getTime();
+                    if (fstat.isDirectory()) {
+                        e.category = "dir";
+                        e.type = "dir";
+                    }
+                    if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
+                    if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
 
-                        if (fstat.isDirectory()) {
-                            e.category = "dir";
-                            e.type = "dir";
-                        }
-                        if (e.category === "dir" && tcwd === settingsDir && file === "themes") e.type="edex-themesDir";
-                        if (e.category === "dir" && tcwd === settingsDir && file === "keyboards") e.type = "edex-kblayoutsDir";
-
-                        if (fstat.isSymbolicLink()) {
-                            e.category = "symlink";
-                            e.type = "symlink";
-                        }
-
-                        if (fstat.isFile()) {
-                            e.category = "file";
-                            e.type = "file";
-                            e.size = fstat.size;
-                        }
-                    } else {
-                        e.type = "system";
-                        e.hidden = true;
+                    if (fstat.isSymbolicLink()) {
+                        e.category = "symlink";
+                        e.type = "symlink";
                     }
 
-                    if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
-                    if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
-                    if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
-                    if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
+                    if (fstat.isFile()) {
+                        e.category = "file";
+                        e.type = "file";
+                        e.size = fstat.size;
+                    }
+                } else {
+                    e.type = "system";
+                    e.hidden = true;
+                }
 
-                    if (file.startsWith(".")) e.hidden = true;
+                if (e.category === "file" && tcwd === themesDir && file.endsWith(".json")) e.type = "edex-theme";
+                if (e.category === "file" && tcwd === keyboardsDir && file.endsWith(".json")) e.type = "edex-kblayout";
+                if (e.category === "file" && tcwd === settingsDir && file === "settings.json") e.type = "edex-settings";
+                if (e.category === "file" && tcwd === settingsDir && file === "shortcuts.json") e.type = "edex-shortcuts";
 
-                    this.cwd.push(e);
-                    if (i === content.length-1) resolve();
-                });
-            }).catch(() => { this.setFailedState() });
+                if (file.startsWith(".")) e.hidden = true;
+
+                this.cwd.push(e);
+            })).catch(() => { this.setFailedState() });
 
             if (this.failed) return false;
 
@@ -594,13 +605,10 @@ class FilesystemDisplay {
             }
         };
 
-        // Automatically start indexing supposed beginning CWD
-        // See #365
-        // ...except if we're hot-reloading, in which case this can mess up the rendering
-        // See #392
-        if (window.performance.navigation.type === 0) {
-            this.readFS(window.term[window.currentTerm].cwd || window.settings.cwd);
-        }
+        // The first directory is not read from here any more. The constructor used to guess it
+        // from the terminal (#365) — except on a hot reload, where the guess and the terminal's
+        // own report raced each other (#392). initUI now hands over the shell's real directory
+        // through showDir, before a terminal exists, and that covers both cases.
 
         this.openFile = (name, path, type) => { //Might add text formatting at some point, not now though - Surge
             let block;

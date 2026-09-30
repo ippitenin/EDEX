@@ -377,6 +377,12 @@ app.on('ready', async () => {
         e.returnValue = tty.port;
     });
 
+    // Where the main shell is — or, before it has reported anything, where it was started. The
+    // filesystem panel comes up ahead of the terminal and needs a directory to show meanwhile.
+    ipc.on("tty-cwd", e => {
+        e.returnValue = tty.tty._cwd || settings.cwd;
+    });
+
     // Support for multithreaded systeminformation calls
     signale.pending("Starting multithreaded calls controller...");
     require("./_multithread.js");
